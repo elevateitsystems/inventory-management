@@ -1,114 +1,49 @@
-
 "use client";
 
-import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import { setSalesSearchTerm } from '@/store/slices/clientSlice';
-import { Search, DollarSign } from "lucide-react";
-import { mockData } from "@/lib/mockData";
+import { useMemo, useState, type FormEvent } from "react";
+import { Plus, Search, ShoppingBag } from "lucide-react";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { recordSale } from "@/store/slices/inventorySlice";
+import { formatCurrency, formatDateTime, nowIso } from "@/lib/inventory";
+import Modal, { FormField, inputClass, primaryButtonClass, secondaryButtonClass } from "../Modal";
+import PageHeader from "../PageHeader";
 
 export default function SalesHistoryTab() {
   const dispatch = useAppDispatch();
-  
-  // Get state from Redux instead of useState
-  const searchTerm = useAppSelector((state) => state.client.salesSearchTerm);
+  const { sales, customers, finishedProducts } = useAppSelector((state) => state.inventory);
+  const [search, setSearch] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [productId, setProductId] = useState(finishedProducts[0]?.id ?? 0);
+  const [quantity, setQuantity] = useState(1);
+  const [unitPrice, setUnitPrice] = useState(finishedProducts[0]?.salePrice ?? 0);
+  const selectedProduct = finishedProducts.find((item) => item.id === productId);
+  const saleTotal = useMemo(() => quantity * unitPrice, [quantity, unitPrice]);
+  const filtered = sales.filter((sale) => {
+    const customer = customers.find((item) => item.id === sale.customerId)?.name ?? "";
+    const product = finishedProducts.find((item) => item.id === sale.productId)?.name ?? "";
+    return `${sale.ref} ${customer} ${product}`.toLowerCase().includes(search.toLowerCase());
+  });
 
-  // Filter sales based on search term
-  const filteredSales = mockData.sales.filter(
-    (s) =>
-      s.invoice.includes(searchTerm) ||
-      s.client.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  // Handler - dispatch action instead of setState
-  const handleSearch = (value: string) => {
-    dispatch(setSalesSearchTerm(value));
+  const selectProduct = (id: number) => {
+    setProductId(id);
+    setUnitPrice(finishedProducts.find((item) => item.id === id)?.salePrice ?? 0);
   };
 
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Sales History</h1>
-          <p className="text-sm text-gray-500">Track all your sales transactions</p>
-        </div>
-        <button className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 transition-colors flex items-center gap-2">
-          <DollarSign className="w-4 h-4" />
-          New Sale
-        </button>
-      </div>
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const payment = Math.min(Number(data.get("payment")), saleTotal);
+    if (!selectedProduct || quantity > selectedProduct.stock) return;
+    dispatch(recordSale({ customerId: Number(data.get("customerId")), productId, quantity, unitPrice, payment, date: nowIso() }));
+    setShowForm(false);
+  };
 
-      <div className="bg-white rounded-2xl shadow-sm p-6">
-        <div className="flex items-center gap-4 mb-6">
-          <div className="flex-1 relative">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search sales..."
-              className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              value={searchTerm}
-              onChange={(e) => handleSearch(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-100">
-                <th className="text-left py-3 text-xs font-medium text-gray-500">Invoice</th>
-                <th className="text-left py-3 text-xs font-medium text-gray-500">Client</th>
-                <th className="text-left py-3 text-xs font-medium text-gray-500">Products</th>
-                <th className="text-left py-3 text-xs font-medium text-gray-500">Total</th>
-                <th className="text-left py-3 text-xs font-medium text-gray-500">Payment</th>
-                <th className="text-left py-3 text-xs font-medium text-gray-500">Status</th>
-                <th className="text-left py-3 text-xs font-medium text-gray-500">Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredSales.map((sale) => (
-                <tr
-                  key={sale.id}
-                  className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors"
-                >
-                  <td className="py-3 text-sm font-medium text-indigo-600">{sale.invoice}</td>
-                  <td className="py-3 text-sm text-gray-900">{sale.client}</td>
-                  <td className="py-3 text-sm text-gray-600">{sale.products} items</td>
-                  <td className="py-3 text-sm font-semibold text-gray-900">
-                    ${sale.total.toFixed(2)}
-                  </td>
-                  <td className="py-3">
-                    <span
-                      className={`px-2.5 py-1 text-xs font-medium rounded-md ${
-                        sale.payment === "Full"
-                          ? "bg-emerald-100 text-emerald-700"
-                          : sale.payment === "Partial"
-                          ? "bg-amber-100 text-amber-700"
-                          : "bg-rose-100 text-rose-700"
-                      }`}
-                    >
-                      {sale.payment}
-                    </span>
-                  </td>
-                  <td className="py-3">
-                    <span
-                      className={`px-2.5 py-1 text-xs font-medium rounded-md ${
-                        sale.status === "Completed"
-                          ? "bg-emerald-100 text-emerald-700"
-                          : sale.status === "Pending"
-                          ? "bg-amber-100 text-amber-700"
-                          : "bg-rose-100 text-rose-700"
-                      }`}
-                    >
-                      {sale.status}
-                    </span>
-                  </td>
-                  <td className="py-3 text-sm text-gray-500">{sale.date}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
+  return <div className="space-y-5">
+    <PageHeader title="Sales" description="Record customer sales and automatically update finished stock and the customer ledger." action={<button onClick={() => setShowForm(true)} disabled={!customers.length || !finishedProducts.length} className={primaryButtonClass}><Plus className="h-4 w-4" />New sale</button>} />
+    <div className="grid gap-4 sm:grid-cols-3"><Metric label="Sales invoices" value={sales.length.toString()} /><Metric label="Total sales" value={formatCurrency(sales.reduce((sum, item) => sum + item.total, 0))} /><Metric label="Units sold" value={sales.reduce((sum, item) => sum + item.quantity, 0).toLocaleString()} /></div>
+    <section className="rounded-2xl border border-slate-200/80 bg-white shadow-sm"><div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5"><div><h2 className="font-bold text-slate-900">Sales history</h2><p className="text-xs text-slate-500">Each invoice creates finished-product Stock OUT and a ledger debit.</p></div><div className="relative w-full sm:w-80"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search sales" className={`${inputClass} pl-9`} /></div></div><div className="overflow-x-auto"><table className="w-full min-w-[860px] text-left"><thead className="bg-slate-50/80 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3 font-semibold">Invoice</th><th className="px-5 py-3 font-semibold">Customer</th><th className="px-5 py-3 font-semibold">Product</th><th className="px-5 py-3 font-semibold">Quantity</th><th className="px-5 py-3 font-semibold">Total</th><th className="px-5 py-3 font-semibold">Date</th></tr></thead><tbody className="divide-y divide-slate-100">{filtered.map((sale) => { const customer = customers.find((item) => item.id === sale.customerId); const product = finishedProducts.find((item) => item.id === sale.productId); return <tr key={sale.id} className="text-sm hover:bg-slate-50/60"><td className="px-5 py-4 font-semibold text-indigo-600">{sale.ref}</td><td className="px-5 py-4 font-medium text-slate-800">{customer?.name}</td><td className="px-5 py-4 text-slate-700">{product?.name}</td><td className="px-5 py-4 text-slate-700">{sale.quantity} {product?.unit}</td><td className="px-5 py-4 font-semibold text-slate-900">{formatCurrency(sale.total)}</td><td className="px-5 py-4 text-slate-500">{formatDateTime(sale.date)}</td></tr>; })}</tbody></table></div></section>
+    {showForm && <Modal title="Record product sale" description="The invoice reduces finished stock and opens a customer ledger entry." onClose={() => setShowForm(false)}><form onSubmit={handleSubmit} className="space-y-4"><FormField label="Customer"><select name="customerId" className={inputClass}>{customers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></FormField><FormField label="Finished product"><select name="productId" value={productId} onChange={(event) => selectProduct(Number(event.target.value))} className={inputClass}>{finishedProducts.map((item) => <option key={item.id} value={item.id}>{item.name} — {item.stock} {item.unit} available</option>)}</select></FormField><div className="grid gap-4 sm:grid-cols-2"><FormField label={`Quantity (${selectedProduct?.unit ?? "units"})`} hint={`Maximum available: ${selectedProduct?.stock ?? 0}`}><input name="quantity" value={quantity} onChange={(event) => setQuantity(Number(event.target.value))} required min="0.01" max={selectedProduct?.stock} step="0.01" type="number" className={inputClass} /></FormField><FormField label="Unit price"><input name="unitPrice" value={unitPrice} onChange={(event) => setUnitPrice(Number(event.target.value))} required min="0" step="0.01" type="number" className={inputClass} /></FormField></div><FormField label="Payment received now" hint={`Invoice total: ${formatCurrency(saleTotal)}. Enter 0 for credit, part of the total for partial, or the full total.`}><input name="payment" defaultValue="0" min="0" max={saleTotal} step="0.01" type="number" className={inputClass} /></FormField><div className="rounded-xl bg-slate-50 px-4 py-3"><div className="flex justify-between text-sm"><span className="text-slate-500">Invoice total</span><strong className="text-slate-900">{formatCurrency(saleTotal)}</strong></div></div><div className="flex justify-end gap-3"><button type="button" onClick={() => setShowForm(false)} className={secondaryButtonClass}>Cancel</button><button className={primaryButtonClass}><ShoppingBag className="h-4 w-4" />Complete sale</button></div></form></Modal>}
+  </div>;
 }
+
+function Metric({ label, value }: { label: string; value: string }) { return <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">{label}</p><p className="mt-1 text-xl font-bold text-slate-900">{value}</p></div>; }

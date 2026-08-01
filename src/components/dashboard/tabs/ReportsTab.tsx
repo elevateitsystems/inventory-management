@@ -1,195 +1,56 @@
-// components/dashboard/tabs/ReportsTab.tsx
 "use client";
 
-import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import { setReportDate, setReportMonth, setReportYear } from '@/store/slices/clientSlice';
-import { BarChart3, FileText, Download, Printer, Calendar } from "lucide-react";
+import { useState } from "react";
+import { ArrowDownToLine, ArrowUpFromLine, CalendarDays, ClipboardList } from "lucide-react";
+import { useAppSelector } from "@/store/hooks";
+import { formatCurrency, formatDateTime, getDateKey, getMonthKey } from "@/lib/inventory";
+import { inputClass } from "../Modal";
+import PageHeader from "../PageHeader";
+
+const today = new Date().toISOString().slice(0, 10);
 
 export default function ReportsTab() {
-  const dispatch = useAppDispatch();
-  
-  //  Get state from Redux
-  const reportDate = useAppSelector((state) => state.client.reportDate);
-  const reportMonth = useAppSelector((state) => state.client.reportMonth);
-  const reportYear = useAppSelector((state) => state.client.reportYear);
+  const inventory = useAppSelector((state) => state.inventory);
+  const [reportDate, setReportDate] = useState(today);
+  const [reportMonth, setReportMonth] = useState(today.slice(0, 7));
+  const dailyTransactions = inventory.transactions.filter((item) => getDateKey(item.date) === reportDate);
+  const dailyMovements = inventory.stockMovements.filter((item) => getDateKey(item.date) === reportDate);
+  const monthlyTransactions = inventory.transactions.filter((item) => getMonthKey(item.date) === reportMonth);
+  const monthlySales = monthlyTransactions.filter((item) => item.type === "Sale").reduce((sum, item) => sum + item.amount, 0);
+  const monthlyPurchases = monthlyTransactions.filter((item) => item.type === "Purchase").reduce((sum, item) => sum + item.amount, 0);
+  const monthlyPayments = monthlyTransactions.filter((item) => item.type === "Payment").reduce((sum, item) => sum + item.amount, 0);
+  const monthlyReturns = monthlyTransactions.filter((item) => item.type === "Return").reduce((sum, item) => sum + item.amount, 0);
+  const inventoryRows = [
+    ...inventory.rawMaterials.map((item) => ({ ...item, kind: "Raw material" as const })),
+    ...inventory.finishedProducts.map((item) => ({ ...item, kind: "Finished product" as const })),
+  ].map((item) => {
+    const stockType = item.kind === "Raw material" ? "raw" : "finished";
+    const movements = inventory.stockMovements.filter((movement) => movement.stockType === stockType && movement.itemId === item.id);
+    return { ...item, stockIn: movements.filter((movement) => movement.type === "IN").reduce((sum, movement) => sum + movement.quantity, 0), stockOut: movements.filter((movement) => movement.type === "OUT").reduce((sum, movement) => sum + movement.quantity, 0) };
+  });
 
-  // Format date for display
-  const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric'
-    });
-  };
-
-  const formatMonth = (month: string) => {
-    if (!month) return '';
-    const [year, monthNum] = month.split('-');
-    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
-                        'July', 'August', 'September', 'October', 'November', 'December'];
-    return `${monthNames[parseInt(monthNum) - 1]} ${year}`;
-  };
-
-  // Handlers
-  const handleDateChange = () => {
-    const today = new Date().toISOString().split('T')[0];
-    dispatch(setReportDate(today));
-  };
-
-  const handlePrevMonth = () => {
-    const [year, month] = reportMonth.split('-').map(Number);
-    let newMonth = month - 1;
-    let newYear = year;
-    if (newMonth === 0) {
-      newMonth = 12;
-      newYear = year - 1;
-    }
-    const newMonthStr = newMonth.toString().padStart(2, '0');
-    dispatch(setReportMonth(`${newYear}-${newMonthStr}`));
-  };
-
-  const handleNextMonth = () => {
-    const [year, month] = reportMonth.split('-').map(Number);
-    let newMonth = month + 1;
-    let newYear = year;
-    if (newMonth === 13) {
-      newMonth = 1;
-      newYear = year + 1;
-    }
-    const newMonthStr = newMonth.toString().padStart(2, '0');
-    dispatch(setReportMonth(`${newYear}-${newMonthStr}`));
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
-          <p className="text-sm text-gray-500">Generate and view inventory reports</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <button 
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors flex items-center gap-2"
-            onClick={handleDateChange}
-          >
-            <Calendar className="w-4 h-4" />
-            {formatDate(reportDate)}
-          </button>
-          <button className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 transition-colors flex items-center gap-2">
-            <Download className="w-4 h-4" />
-            Export Report
-          </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white rounded-2xl shadow-sm p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-              <BarChart3 className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900">Inventory Report</h3>
-              <p className="text-xs text-gray-500">Opening & closing balances</p>
-            </div>
-          </div>
-          <div className="space-y-3">
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Opening Balance</span>
-              <span className="font-semibold text-gray-900">$45,230.50</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Stock In</span>
-              <span className="font-semibold text-emerald-600">+$12,450.00</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Stock Out</span>
-              <span className="font-semibold text-rose-600">-$8,230.00</span>
-            </div>
-            <div className="flex justify-between text-sm pt-2 border-t border-gray-100">
-              <span className="text-gray-900 font-medium">Closing Balance</span>
-              <span className="font-bold text-gray-900">$49,450.50</span>
-            </div>
-          </div>
-          <button className="w-full mt-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors flex items-center justify-center gap-2">
-            <Printer className="w-4 h-4" />
-            Print Report
-          </button>
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-sm p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <FileText className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900">Daily Transactions</h3>
-              <p className="text-xs text-gray-500">{formatDate(reportDate)}</p>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Total Sales</span>
-              <span className="font-semibold text-gray-900">$3,450.50</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Total Purchases</span>
-              <span className="font-semibold text-gray-900">$2,100.00</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Returns</span>
-              <span className="font-semibold text-rose-600">-$450.75</span>
-            </div>
-            <div className="flex justify-between text-sm pt-2 border-t border-gray-100">
-              <span className="text-gray-900 font-medium">Net Revenue</span>
-              <span className="font-bold text-emerald-600">$899.75</span>
-            </div>
-          </div>
-          <button className="w-full mt-4 py-2 text-sm font-medium text-emerald-600 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors flex items-center justify-center gap-2">
-            <Download className="w-4 h-4" />
-            Download Report
-          </button>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-2xl shadow-sm p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-gray-900">Monthly Report - {formatMonth(reportMonth)}</h3>
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={handlePrevMonth}
-              className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              ←
-            </button>
-            <span className="text-sm font-medium text-gray-700">{formatMonth(reportMonth)}</span>
-            <button 
-              onClick={handleNextMonth}
-              className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              →
-            </button>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="text-center p-3 bg-gray-50 rounded-xl">
-            <p className="text-xs text-gray-500">Total Sales</p>
-            <p className="text-lg font-bold text-gray-900">$24,890</p>
-          </div>
-          <div className="text-center p-3 bg-gray-50 rounded-xl">
-            <p className="text-xs text-gray-500">Total Purchases</p>
-            <p className="text-lg font-bold text-gray-900">$16,430</p>
-          </div>
-          <div className="text-center p-3 bg-gray-50 rounded-xl">
-            <p className="text-xs text-gray-500">Gross Profit</p>
-            <p className="text-lg font-bold text-emerald-600">$8,460</p>
-          </div>
-          <div className="text-center p-3 bg-gray-50 rounded-xl">
-            <p className="text-xs text-gray-500">Transactions</p>
-            <p className="text-lg font-bold text-gray-900">342</p>
-          </div>
-        </div>
-      </div>
+  return <div className="space-y-5">
+    <PageHeader title="Reports" description="Daily transactions, stock movements, monthly summaries, and inventory balances." />
+    <div className="grid gap-5 xl:grid-cols-2">
+      <ReportCard title="Daily Transactions" subtitle="All purchase, production, sale, payment, and return activity." icon={<CalendarDays className="h-5 w-5" />} control={<input type="date" value={reportDate} onChange={(event) => setReportDate(event.target.value)} className={`${inputClass} w-auto py-2`} />}>
+        <div className="mb-4 grid grid-cols-3 gap-3"><MiniMetric label="Entries" value={dailyTransactions.length.toString()} /><MiniMetric label="Sales" value={formatCurrency(dailyTransactions.filter((item) => item.type === "Sale").reduce((sum, item) => sum + item.amount, 0))} /><MiniMetric label="Payments" value={formatCurrency(dailyTransactions.filter((item) => item.type === "Payment").reduce((sum, item) => sum + item.amount, 0))} /></div>
+        <div className="max-h-72 overflow-auto rounded-xl border border-slate-100"><table className="w-full min-w-[560px] text-left text-sm"><thead className="sticky top-0 bg-slate-50 text-xs text-slate-500"><tr><th className="px-3 py-2.5">Type</th><th className="px-3 py-2.5">Reference</th><th className="px-3 py-2.5">Party / item</th><th className="px-3 py-2.5 text-right">Amount</th></tr></thead><tbody className="divide-y divide-slate-100">{dailyTransactions.map((item) => <tr key={item.id}><td className="px-3 py-3 font-medium text-slate-800">{item.type}</td><td className="px-3 py-3 text-indigo-600">{item.ref}</td><td className="px-3 py-3 text-slate-600">{item.party}</td><td className="px-3 py-3 text-right font-medium">{item.amount ? formatCurrency(item.amount) : "—"}</td></tr>)}{!dailyTransactions.length && <tr><td colSpan={4} className="px-3 py-10 text-center text-slate-400">No transactions for this date.</td></tr>}</tbody></table></div>
+      </ReportCard>
+      <ReportCard title="Daily Stock Movement" subtitle="Raw material and finished product movement history." icon={<ArrowUpFromLine className="h-5 w-5" />} control={<input type="date" value={reportDate} onChange={(event) => setReportDate(event.target.value)} className={`${inputClass} w-auto py-2`} />}>
+        <div className="mb-4 grid grid-cols-3 gap-3"><MiniMetric label="Movements" value={dailyMovements.length.toString()} /><MiniMetric label="Stock IN" value={dailyMovements.filter((item) => item.type === "IN").reduce((sum, item) => sum + item.quantity, 0).toLocaleString()} /><MiniMetric label="Stock OUT" value={dailyMovements.filter((item) => item.type === "OUT").reduce((sum, item) => sum + item.quantity, 0).toLocaleString()} /></div>
+        <div className="max-h-72 overflow-auto rounded-xl border border-slate-100"><table className="w-full min-w-[560px] text-left text-sm"><thead className="sticky top-0 bg-slate-50 text-xs text-slate-500"><tr><th className="px-3 py-2.5">Item</th><th className="px-3 py-2.5">Movement</th><th className="px-3 py-2.5">Reason</th><th className="px-3 py-2.5 text-right">Quantity</th></tr></thead><tbody className="divide-y divide-slate-100">{dailyMovements.map((item) => <tr key={item.id}><td className="px-3 py-3"><p className="font-medium text-slate-800">{item.itemName}</p><p className="text-xs capitalize text-slate-400">{item.stockType}</p></td><td className="px-3 py-3"><span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-bold ${item.type === "IN" ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}>{item.type === "IN" ? <ArrowDownToLine className="h-3 w-3" /> : <ArrowUpFromLine className="h-3 w-3" />}{item.type}</span></td><td className="px-3 py-3 text-slate-600">{item.reason}</td><td className="px-3 py-3 text-right font-semibold">{item.quantity.toLocaleString()}</td></tr>)}{!dailyMovements.length && <tr><td colSpan={4} className="px-3 py-10 text-center text-slate-400">No stock movements for this date.</td></tr>}</tbody></table></div>
+      </ReportCard>
     </div>
-  );
+    <ReportCard title="Monthly Report" subtitle="Calculated from the complete transaction history for the selected month." icon={<ClipboardList className="h-5 w-5" />} control={<input type="month" value={reportMonth} onChange={(event) => setReportMonth(event.target.value)} className={`${inputClass} w-auto py-2`} />}>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5"><MonthlyMetric label="Sales" value={formatCurrency(monthlySales)} color="text-indigo-600" /><MonthlyMetric label="Purchases" value={formatCurrency(monthlyPurchases)} /><MonthlyMetric label="Payments received" value={formatCurrency(monthlyPayments)} color="text-emerald-600" /><MonthlyMetric label="Returns" value={formatCurrency(monthlyReturns)} color="text-amber-600" /><MonthlyMetric label="Transactions" value={monthlyTransactions.length.toString()} /></div>
+    </ReportCard>
+    <ReportCard title="Inventory Report" subtitle="Opening balance, total Stock IN, total Stock OUT, and current closing balance." icon={<ClipboardList className="h-5 w-5" />}>
+      <div className="overflow-x-auto rounded-xl border border-slate-100"><table className="w-full min-w-[800px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Item</th><th className="px-4 py-3">Category</th><th className="px-4 py-3 text-right">Opening balance</th><th className="px-4 py-3 text-right">Stock IN</th><th className="px-4 py-3 text-right">Stock OUT</th><th className="px-4 py-3 text-right">Closing balance</th></tr></thead><tbody className="divide-y divide-slate-100">{inventoryRows.map((item) => <tr key={`${item.kind}-${item.id}`}><td className="px-4 py-3"><p className="font-semibold text-slate-800">{item.name}</p><p className="text-xs text-slate-400">{item.sku}</p></td><td className="px-4 py-3 text-slate-600">{item.kind}</td><td className="px-4 py-3 text-right text-slate-600">{item.openingStock.toLocaleString()} {item.unit}</td><td className="px-4 py-3 text-right font-medium text-emerald-600">+{item.stockIn.toLocaleString()}</td><td className="px-4 py-3 text-right font-medium text-rose-600">-{item.stockOut.toLocaleString()}</td><td className="px-4 py-3 text-right font-bold text-slate-900">{item.stock.toLocaleString()} {item.unit}</td></tr>)}</tbody></table></div>
+    </ReportCard>
+    <p className="text-center text-xs text-slate-400">Reports are calculated from saved transaction and stock movement history. Last viewed {formatDateTime(new Date().toISOString())}.</p>
+  </div>;
 }
+
+function ReportCard({ title, subtitle, icon, control, children }: { title: string; subtitle: string; icon: React.ReactNode; control?: React.ReactNode; children: React.ReactNode }) { return <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm"><div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl bg-indigo-50 text-indigo-600">{icon}</div><div><h2 className="font-bold text-slate-900">{title}</h2><p className="text-xs text-slate-500">{subtitle}</p></div></div>{control}</div>{children}</section>; }
+function MiniMetric({ label, value }: { label: string; value: string }) { return <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">{label}</p><p className="mt-1 text-sm font-bold text-slate-900">{value}</p></div>; }
+function MonthlyMetric({ label, value, color = "text-slate-900" }: { label: string; value: string; color?: string }) { return <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4"><p className="text-xs text-slate-500">{label}</p><p className={`mt-1 text-xl font-bold ${color}`}>{value}</p></div>; }
