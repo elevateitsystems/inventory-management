@@ -1,158 +1,44 @@
-
 "use client";
 
-import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import { setProductSearchTerm, setSelectedProduct } from '@/store/slices/clientSlice';
-import { Search, Plus, X } from "lucide-react";
-import { mockData } from "@/lib/mockData";
+import { useState, type FormEvent } from "react";
+import { AlertTriangle, Boxes, Plus, Search } from "lucide-react";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { addFinishedProduct } from "@/store/slices/inventorySlice";
+import { formatCurrency } from "@/lib/inventory";
+import Modal, { FormField, inputClass, primaryButtonClass, secondaryButtonClass } from "../Modal";
+import PageHeader from "../PageHeader";
 
 export default function ProductsTab() {
   const dispatch = useAppDispatch();
-  
-  //  Get state from Redux instead of useState
-  const searchTerm = useAppSelector((state) => state.client.productSearchTerm);
-  const selectedProduct = useAppSelector((state) => state.client.selectedProduct);
+  const products = useAppSelector((state) => state.inventory.finishedProducts);
+  const [search, setSearch] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const filtered = products.filter((item) => `${item.name} ${item.sku}`.toLowerCase().includes(search.toLowerCase()));
 
-  // Filter products based on search term
-  const filteredProducts = mockData.products.filter(
-    (p) =>
-      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.sku.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  // Handlers - dispatch actions instead of useState setters
-  const handleSearch = (value: string) => {
-    dispatch(setProductSearchTerm(value));
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    dispatch(addFinishedProduct({ name: String(data.get("name")), sku: String(data.get("sku")), unit: String(data.get("unit")), stock: Number(data.get("stock")), reorderLevel: Number(data.get("reorderLevel")), salePrice: Number(data.get("salePrice")) }));
+    setShowForm(false);
   };
 
-  const handleSelectProduct = (product: any) => {
-    dispatch(setSelectedProduct(product));
-  };
-
-  const handleCloseModal = () => {
-    dispatch(setSelectedProduct(null));
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Products</h1>
-          <p className="text-sm text-gray-500">Manage your product inventory</p>
-        </div>
-        <button className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 transition-colors flex items-center gap-2">
-          <Plus className="w-4 h-4" />
-          Add Product
-        </button>
-      </div>
-
-      <div className="bg-white rounded-2xl shadow-sm p-6">
-        <div className="flex items-center gap-4 mb-6">
-          <div className="flex-1 relative">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search products..."
-              className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              value={searchTerm}
-              onChange={(e) => handleSearch(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredProducts.map((product) => (
-            <div
-              key={product.id}
-              className="p-4 border border-gray-100 rounded-xl hover:shadow-md transition-shadow cursor-pointer"
-              onClick={() => handleSelectProduct(product)}
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <h4 className="font-semibold text-gray-900">{product.name}</h4>
-                  <p className="text-xs text-gray-500">SKU: {product.sku}</p>
-                </div>
-                <span
-                  className={`px-2 py-1 text-xs font-medium rounded-md ${
-                    product.stock > 20
-                      ? "bg-emerald-100 text-emerald-700"
-                      : product.stock > 10
-                      ? "bg-amber-100 text-amber-700"
-                      : "bg-rose-100 text-rose-700"
-                  }`}
-                >
-                  {product.stock} units
-                </span>
-              </div>
-              <div className="mt-3 pt-3 border-t border-gray-100">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">
-                    Price: <strong className="text-gray-900">${product.price.toFixed(2)}</strong>
-                  </span>
-                  <span className="text-gray-500">
-                    Category: <strong className="text-gray-900">{product.category}</strong>
-                  </span>
-                </div>
-                <p className="text-xs text-gray-500 mt-1">Supplier: {product.supplier}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {selectedProduct && (
-        <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-          onClick={handleCloseModal}
-        >
-          <div
-            className="bg-white rounded-2xl p-6 max-w-md w-full mx-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-gray-900">{selectedProduct.name}</h3>
-              <button
-                onClick={handleCloseModal}
-                className="p-1 hover:bg-gray-100 rounded-lg"
-              >
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
-            <div className="space-y-3">
-              <div>
-                <span className="text-sm text-gray-500">SKU:</span>{" "}
-                <span className="text-sm text-gray-900">{selectedProduct.sku}</span>
-              </div>
-              <div>
-                <span className="text-sm text-gray-500">Price:</span>{" "}
-                <span className="text-sm font-semibold text-gray-900">
-                  ${selectedProduct.price.toFixed(2)}
-                </span>
-              </div>
-              <div>
-                <span className="text-sm text-gray-500">Stock:</span>{" "}
-                <span className="text-sm text-gray-900">{selectedProduct.stock} units</span>
-              </div>
-              <div>
-                <span className="text-sm text-gray-500">Category:</span>{" "}
-                <span className="text-sm text-gray-900">{selectedProduct.category}</span>
-              </div>
-              <div>
-                <span className="text-sm text-gray-500">Supplier:</span>{" "}
-                <span className="text-sm text-gray-900">{selectedProduct.supplier}</span>
-              </div>
-              <div className="pt-3 border-t border-gray-100 flex gap-2">
-                <button className="flex-1 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">
-                  Edit Product
-                </button>
-                <button className="flex-1 py-2 text-sm font-medium text-rose-600 bg-rose-50 rounded-lg hover:bg-rose-100">
-                  Delete
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+  return <div className="space-y-5">
+    <PageHeader title="Finished Products" description="Manage saleable products and current finished-goods stock." action={<button onClick={() => setShowForm(true)} className={primaryButtonClass}><Plus className="h-4 w-4" />Add product</button>} />
+    <div className="grid gap-4 sm:grid-cols-3">
+      <Summary label="Product types" value={products.length.toString()} icon={<Boxes className="h-5 w-5" />} />
+      <Summary label="Finished stock" value={products.reduce((sum, item) => sum + item.stock, 0).toLocaleString()} icon={<Boxes className="h-5 w-5" />} />
+      <Summary label="Below reorder level" value={products.filter((item) => item.stock <= item.reorderLevel).length.toString()} icon={<AlertTriangle className="h-5 w-5" />} warning />
     </div>
-  );
+    <section className="rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+      <div className="border-b border-slate-100 p-4 sm:p-5"><div className="relative max-w-md"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search product or SKU" className={`${inputClass} pl-9`} /></div></div>
+      <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left"><thead className="bg-slate-50/80 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3 font-semibold">Product</th><th className="px-5 py-3 font-semibold">Unit</th><th className="px-5 py-3 font-semibold">Available stock</th><th className="px-5 py-3 font-semibold">Reorder level</th><th className="px-5 py-3 font-semibold">Sale price</th><th className="px-5 py-3 font-semibold">Status</th></tr></thead>
+        <tbody className="divide-y divide-slate-100">{filtered.map((item) => { const low = item.stock <= item.reorderLevel; return <tr key={item.id} className="text-sm hover:bg-slate-50/60"><td className="px-5 py-4"><p className="font-semibold text-slate-900">{item.name}</p><p className="text-xs text-slate-400">{item.sku}</p></td><td className="px-5 py-4 text-slate-600">{item.unit}</td><td className="px-5 py-4 font-semibold text-slate-900">{item.stock.toLocaleString()} {item.unit}</td><td className="px-5 py-4 text-slate-600">{item.reorderLevel.toLocaleString()} {item.unit}</td><td className="px-5 py-4 text-slate-600">{formatCurrency(item.salePrice)}</td><td className="px-5 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${low ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>{low ? "Low stock" : "In stock"}</span></td></tr>; })}</tbody>
+      </table></div>
+    </section>
+    {showForm && <Modal title="Add finished product" description="Create a saleable product and set its opening stock." onClose={() => setShowForm(false)}><form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2"><FormField label="Product name"><input name="name" required className={inputClass} /></FormField><FormField label="SKU"><input name="sku" required className={inputClass} /></FormField><FormField label="Unit"><select name="unit" className={inputClass}><option>pcs</option><option>packs</option><option>boxes</option><option>kg</option></select></FormField><FormField label="Opening stock"><input name="stock" required min="0" step="0.01" type="number" className={inputClass} /></FormField><FormField label="Reorder level"><input name="reorderLevel" required min="0" step="0.01" type="number" className={inputClass} /></FormField><FormField label="Sale price"><input name="salePrice" required min="0" step="0.01" type="number" className={inputClass} /></FormField><div className="flex justify-end gap-3 sm:col-span-2"><button type="button" onClick={() => setShowForm(false)} className={secondaryButtonClass}>Cancel</button><button className={primaryButtonClass}>Save product</button></div></form></Modal>}
+  </div>;
+}
+
+function Summary({ label, value, icon, warning = false }: { label: string; value: string; icon: React.ReactNode; warning?: boolean }) {
+  return <div className="flex items-center gap-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm"><div className={`grid h-11 w-11 place-items-center rounded-xl ${warning ? "bg-amber-50 text-amber-600" : "bg-violet-50 text-violet-600"}`}>{icon}</div><div><p className="text-sm text-slate-500">{label}</p><p className="text-xl font-bold text-slate-900">{value}</p></div></div>;
 }

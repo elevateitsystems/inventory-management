@@ -1,97 +1,30 @@
-
 "use client";
 
-import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import { toggleShowAllTransactions } from '@/store/slices/clientSlice';
-import { Calendar, RefreshCw } from "lucide-react";
-
-import { mockData } from "@/lib/mockData";
-import StatCard from "../StatCard";
-import TransactionsTable from "../TransactionsTable";
-import LowStockAlerts from "../LowStockAlerts";
-import StockMovementChart from "../StockMovementChart";
+import { AlertTriangle, Boxes, Factory, PackageCheck, ReceiptText, Users } from "lucide-react";
+import { useAppSelector } from "@/store/hooks";
+import { formatCurrency, formatDateTime, getCustomerDue, getDateKey } from "@/lib/inventory";
+import PageHeader from "../PageHeader";
 
 export default function DashboardTab() {
-  const dispatch = useAppDispatch();
-  
-  //  Get state from Redux instead of useState
-  const showAllTransactions = useAppSelector((state) => state.client.showAllTransactions);
+  const inventory = useAppSelector((state) => state.inventory);
+  const today = new Date().toISOString().slice(0, 10);
+  const todayTransactions = inventory.transactions.filter((item) => getDateKey(item.date) === today);
+  const lowStock = [
+    ...inventory.rawMaterials.map((item) => ({ ...item, kind: "Raw material" })),
+    ...inventory.finishedProducts.map((item) => ({ ...item, kind: "Finished product" })),
+  ].filter((item) => item.stock <= item.reorderLevel);
+  const outstanding = inventory.customers.reduce((sum, customer) => sum + Math.max(0, getCustomerDue(inventory.ledger, customer.id)), 0);
 
-  // Handle toggle - dispatch action instead of setState
-  const handleToggleShowAll = () => {
-    dispatch(toggleShowAllTransactions());
-  };
-
-  return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-sm text-gray-500">
-            Welcome back, John! Here's what's happening with your inventory.
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <button className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors flex items-center gap-2">
-            <Calendar className="w-4 h-4" />
-            July 13, 2026
-          </button>
-          <button className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 transition-colors flex items-center gap-2">
-            <RefreshCw className="w-4 h-4" />
-            Refresh
-          </button>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          title="Total Products"
-          value="1,284"
-          icon="Package"
-          change="12.5%"
-          changeType="up"
-          color="indigo"
-        />
-        <StatCard
-          title="Total Sales"
-          value="$24,890"
-          icon="DollarSign"
-          change="8.2%"
-          changeType="up"
-          color="green"
-        />
-        <StatCard
-          title="Total Purchases"
-          value="$16,430"
-          icon="ShoppingCart"
-          change="3.1%"
-          changeType="down"
-          color="blue"
-        />
-        <StatCard
-          title="Active Clients"
-          value="342"
-          icon="Users"
-          change="15.3%"
-          changeType="up"
-          color="amber"
-        />
-      </div>
-
-      {/* Stock Movement Chart */}
-      <StockMovementChart/>
-
-      {/* Recent Transactions */}
-      <TransactionsTable
-        transactions={mockData.transactions}
-        showAll={showAllTransactions}
-        onToggleShowAll={handleToggleShowAll}
-      />
-
-      {/* Low Stock Alerts */}
-      <LowStockAlerts />
+  return <div className="space-y-5">
+    <PageHeader title="Inventory Dashboard" description="Live summary of purchasing, production, sales, stock, and customer dues." action={<div className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600">{new Intl.DateTimeFormat("en-US", { dateStyle: "long" }).format(new Date())}</div>} />
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Stat label="Raw material stock" value={inventory.rawMaterials.reduce((sum, item) => sum + item.stock, 0).toLocaleString()} subtext={`${inventory.rawMaterials.length} material types`} icon={<Boxes className="h-5 w-5" />} color="indigo" /><Stat label="Finished product stock" value={inventory.finishedProducts.reduce((sum, item) => sum + item.stock, 0).toLocaleString()} subtext={`${inventory.finishedProducts.length} product types`} icon={<PackageCheck className="h-5 w-5" />} color="violet" /><Stat label="Today's sales" value={formatCurrency(todayTransactions.filter((item) => item.type === "Sale").reduce((sum, item) => sum + item.amount, 0))} subtext={`${todayTransactions.filter((item) => item.type === "Sale").length} invoices`} icon={<ReceiptText className="h-5 w-5" />} color="emerald" /><Stat label="Outstanding dues" value={formatCurrency(outstanding)} subtext={`${inventory.customers.length} customers`} icon={<Users className="h-5 w-5" />} color="rose" /></div>
+    <div className="grid gap-5 xl:grid-cols-[1.4fr_1fr]">
+      <section className="rounded-2xl border border-slate-200/80 bg-white shadow-sm"><div className="border-b border-slate-100 p-5"><h2 className="font-bold text-slate-900">Recent transactions</h2><p className="text-xs text-slate-500">Latest activity across the business.</p></div><div className="overflow-x-auto"><table className="w-full min-w-[680px] text-left"><thead className="bg-slate-50/80 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3">Type</th><th className="px-5 py-3">Reference</th><th className="px-5 py-3">Party / item</th><th className="px-5 py-3 text-right">Amount</th><th className="px-5 py-3">Date</th></tr></thead><tbody className="divide-y divide-slate-100">{inventory.transactions.slice(0, 7).map((item) => <tr key={item.id} className="text-sm hover:bg-slate-50/60"><td className="px-5 py-3.5"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${typeStyle[item.type]}`}>{item.type}</span></td><td className="px-5 py-3.5 font-medium text-slate-800">{item.ref}</td><td className="px-5 py-3.5 text-slate-600">{item.party}</td><td className="px-5 py-3.5 text-right font-semibold text-slate-900">{item.amount ? formatCurrency(item.amount) : "—"}</td><td className="px-5 py-3.5 text-slate-500">{formatDateTime(item.date)}</td></tr>)}</tbody></table></div></section>
+      <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm"><div className="mb-4 flex items-center justify-between"><div><h2 className="font-bold text-slate-900">Low stock alerts</h2><p className="text-xs text-slate-500">Items at or below reorder level.</p></div><div className="grid h-10 w-10 place-items-center rounded-xl bg-amber-50 text-amber-600"><AlertTriangle className="h-5 w-5" /></div></div><div className="space-y-2">{lowStock.map((item) => <div key={`${item.kind}-${item.id}`} className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/70 p-3"><div><p className="text-sm font-semibold text-slate-800">{item.name}</p><p className="text-xs text-slate-400">{item.kind} · Reorder at {item.reorderLevel}</p></div><span className="rounded-lg bg-amber-100 px-2.5 py-1 text-sm font-bold text-amber-700">{item.stock} {item.unit}</span></div>)}{!lowStock.length && <div className="py-10 text-center text-sm text-slate-400">All stock levels are healthy.</div>}</div></section>
     </div>
-  );
+    <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm"><div className="mb-4 flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl bg-indigo-50 text-indigo-600"><Factory className="h-5 w-5" /></div><div><h2 className="font-bold text-slate-900">Recent stock movement</h2><p className="text-xs text-slate-500">Audit trail for stock entering and leaving inventory.</p></div></div><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{inventory.stockMovements.slice(0, 8).map((item) => <div key={item.id} className="rounded-xl border border-slate-100 p-3"><div className="flex items-start justify-between"><div><p className="text-sm font-semibold text-slate-800">{item.itemName}</p><p className="text-xs text-slate-400">{item.reason} · {item.ref}</p></div><span className={`text-sm font-bold ${item.type === "IN" ? "text-emerald-600" : "text-rose-600"}`}>{item.type === "IN" ? "+" : "-"}{item.quantity}</span></div></div>)}</div></section>
+  </div>;
 }
+
+const typeStyle = { Purchase: "bg-blue-100 text-blue-700", Production: "bg-violet-100 text-violet-700", Sale: "bg-indigo-100 text-indigo-700", Payment: "bg-emerald-100 text-emerald-700", Return: "bg-amber-100 text-amber-700" };
+function Stat({ label, value, subtext, icon, color }: { label: string; value: string; subtext: string; icon: React.ReactNode; color: "indigo" | "violet" | "emerald" | "rose" }) { const colors = { indigo: "bg-indigo-50 text-indigo-600", violet: "bg-violet-50 text-violet-600", emerald: "bg-emerald-50 text-emerald-600", rose: "bg-rose-50 text-rose-600" }; return <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm"><div className="flex items-start justify-between"><div><p className="text-sm font-medium text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold tracking-tight text-slate-950">{value}</p></div><div className={`grid h-11 w-11 place-items-center rounded-xl ${colors[color]}`}>{icon}</div></div><p className="mt-3 text-xs text-slate-400">{subtext}</p></div>; }

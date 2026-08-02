@@ -1,56 +1,30 @@
-
 "use client";
 
-import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import { setActiveTab } from '@/store/slices/clientSlice';
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { setActiveTab } from "@/store/slices/clientSlice";
 import Sidebar from "@/components/dashboard/Sidebar";
-import ClientsTab from "@/components/dashboard/tabs/ClientsTab";
+import CustomerLedgerTab from "@/components/dashboard/tabs/CustomerLedgerTab";
 import DashboardTab from "@/components/dashboard/tabs/DashboardTab";
 import ProductsTab from "@/components/dashboard/tabs/ProductsTab";
+import ProductionTab from "@/components/dashboard/tabs/ProductionTab";
 import PurchaseHistoryTab from "@/components/dashboard/tabs/PurchaseHistoryTab";
+import RawMaterialsTab from "@/components/dashboard/tabs/RawMaterialsTab";
 import ReportsTab from "@/components/dashboard/tabs/ReportsTab";
 import SalesHistoryTab from "@/components/dashboard/tabs/SalesHistoryTab";
-import SettingsTab from "@/components/dashboard/tabs/SettingsTab";
-import SuppliersTab from "@/components/dashboard/tabs/SuppliersTab";
 
 export default function DashboardPage() {
   const dispatch = useAppDispatch();
-  
-  // Get activeTab from Redux instead of useState
   const activeTab = useAppSelector((state) => state.client.activeTab);
+  const content = {
+    Dashboard: <DashboardTab />,
+    "Raw Materials": <RawMaterialsTab />,
+    Purchases: <PurchaseHistoryTab />,
+    Production: <ProductionTab />,
+    "Finished Products": <ProductsTab />,
+    Sales: <SalesHistoryTab />,
+    "Customer Ledger": <CustomerLedgerTab />,
+    Reports: <ReportsTab />,
+  }[activeTab] ?? <DashboardTab />;
 
-  const renderTab = () => {
-    switch (activeTab) {
-      case "Dashboard":
-        return <DashboardTab />;
-      case "Clients":
-        return <ClientsTab />;
-      case "Suppliers":
-        return <SuppliersTab />;
-      case "Products":
-        return <ProductsTab />;
-      case "Purchase History":
-        return <PurchaseHistoryTab />;
-      case "Sales History":
-        return <SalesHistoryTab />;
-      case "Reports":
-        return <ReportsTab />;
-      case "Settings":
-        return <SettingsTab />;
-      default:
-        return <DashboardTab />;
-    }
-  };
-
-  // Handler - dispatch action instead of setState
-  const handleTabChange = (tab: string) => {
-    dispatch(setActiveTab(tab));
-  };
-
-  return (
-    <div className="flex min-h-screen bg-[#f0f2f5]">
-      <Sidebar activeTab={activeTab} setActiveTab={handleTabChange} />
-      <main className="flex-1 p-6 overflow-y-auto">{renderTab()}</main>
-    </div>
-  );
+  return <div className="flex min-h-screen bg-slate-100/80"><Sidebar activeTab={activeTab} setActiveTab={(tab) => dispatch(setActiveTab(tab))} /><main className="min-w-0 flex-1 p-5 sm:p-7 lg:p-8">{content}</main></div>;
 }
