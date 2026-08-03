@@ -1,142 +1,44 @@
-import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 
 export type StockType = "raw" | "finished";
 export type MovementType = "IN" | "OUT";
 export type LedgerType = "Sale" | "Payment" | "Return";
 export type TransactionType = "Purchase" | "Production" | "Sale" | "Payment" | "Return";
 
-export interface RawMaterial {
-  id: number;
-  name: string;
-  sku: string;
-  unit: string;
-  stock: number;
-  openingStock: number;
-  reorderLevel: number;
-  unitCost: number;
-}
-
-export interface FinishedProduct {
-  id: number;
-  name: string;
-  sku: string;
-  unit: string;
-  stock: number;
-  openingStock: number;
-  reorderLevel: number;
-  salePrice: number;
-}
-
-export interface Customer {
-  id: number;
-  name: string;
-  phone: string;
-}
-
-export interface Purchase {
-  id: number;
-  ref: string;
-  supplier: string;
-  materialId: number;
-  quantity: number;
-  unitCost: number;
-  total: number;
-  date: string;
-}
-
-export interface Production {
-  id: number;
-  ref: string;
-  materialId: number;
-  materialQuantity: number;
-  productId: number;
-  productQuantity: number;
-  date: string;
-}
-
-export interface Sale {
-  id: number;
-  ref: string;
-  customerId: number;
-  productId: number;
-  quantity: number;
-  unitPrice: number;
-  total: number;
-  date: string;
-}
-
-export interface ProductReturn {
-  id: number;
-  ref: string;
-  customerId: number;
-  productId: number;
-  quantity: number;
-  unitPrice: number;
-  total: number;
-  date: string;
-}
-
-export interface LedgerEntry {
-  id: number;
-  customerId: number;
-  type: LedgerType;
-  ref: string;
-  debit: number;
-  credit: number;
-  date: string;
-  note: string;
-}
-
-export interface StockMovement {
-  id: number;
-  stockType: StockType;
-  itemId: number;
-  itemName: string;
-  type: MovementType;
-  quantity: number;
-  reason: TransactionType;
-  ref: string;
-  date: string;
-}
-
-export interface DailyTransaction {
-  id: number;
-  type: TransactionType;
-  ref: string;
-  party: string;
-  amount: number;
-  date: string;
-}
+export interface RawMaterial { id: number; name: string; sku: string; unit: string; stock: number; openingStock: number; reorderLevel: number; unitCost: number; active: boolean }
+export interface FinishedProduct { id: number; name: string; sku: string; unit: string; stock: number; openingStock: number; reorderLevel: number; salePrice: number; active: boolean }
+export interface Customer { id: number; name: string; phone: string; email: string; active: boolean }
+export interface Purchase { id: number; ref: string; supplier: string; materialId: number; quantity: number; unitCost: number; total: number; date: string }
+export interface Production { id: number; ref: string; materialId: number; materialQuantity: number; productId: number; productQuantity: number; date: string }
+export interface Sale { id: number; ref: string; customerId: number; productId: number; quantity: number; unitPrice: number; total: number; date: string }
+export interface ProductReturn { id: number; ref: string; customerId: number; productId: number; quantity: number; unitPrice: number; total: number; date: string }
+export interface Payment { id: number; ref: string; customerId: number; amount: number; date: string; note: string }
+export interface LedgerEntry { id: number; customerId: number; type: LedgerType; ref: string; debit: number; credit: number; date: string; note: string }
+export interface StockMovement { id: number; stockType: StockType; itemId: number; itemName: string; type: MovementType; quantity: number; reason: TransactionType; ref: string; date: string }
+export interface DailyTransaction { id: number; type: TransactionType; ref: string; party: string; amount: number; date: string }
 
 export interface InventoryState {
-  rawMaterials: RawMaterial[];
-  finishedProducts: FinishedProduct[];
-  customers: Customer[];
-  purchases: Purchase[];
-  productions: Production[];
-  sales: Sale[];
-  returns: ProductReturn[];
-  ledger: LedgerEntry[];
-  stockMovements: StockMovement[];
-  transactions: DailyTransaction[];
+  rawMaterials: RawMaterial[]; finishedProducts: FinishedProduct[]; customers: Customer[];
+  purchases: Purchase[]; productions: Production[]; sales: Sale[]; returns: ProductReturn[]; payments: Payment[];
+  ledger: LedgerEntry[]; stockMovements: StockMovement[]; transactions: DailyTransaction[];
 }
 
 const initialState: InventoryState = {
   rawMaterials: [
-    { id: 1, name: "Flour", sku: "RM-FLR-001", unit: "kg", stock: 420, openingStock: 350, reorderLevel: 120, unitCost: 0.82 },
-    { id: 2, name: "Sugar", sku: "RM-SGR-002", unit: "kg", stock: 86, openingStock: 86, reorderLevel: 100, unitCost: 0.74 },
-    { id: 3, name: "Butter", sku: "RM-BTR-003", unit: "kg", stock: 42, openingStock: 50, reorderLevel: 30, unitCost: 5.4 },
-    { id: 4, name: "Packaging", sku: "RM-PKG-004", unit: "pcs", stock: 640, openingStock: 440, reorderLevel: 200, unitCost: 0.12 },
+    { id: 1, name: "Flour", sku: "RM-FLR-001", unit: "kg", stock: 420, openingStock: 350, reorderLevel: 120, unitCost: 0.82, active: true },
+    { id: 2, name: "Sugar", sku: "RM-SGR-002", unit: "kg", stock: 86, openingStock: 86, reorderLevel: 100, unitCost: 0.74, active: true },
+    { id: 3, name: "Butter", sku: "RM-BTR-003", unit: "kg", stock: 42, openingStock: 50, reorderLevel: 30, unitCost: 5.4, active: true },
+    { id: 4, name: "Packaging", sku: "RM-PKG-004", unit: "pcs", stock: 640, openingStock: 440, reorderLevel: 200, unitCost: 0.12, active: true },
   ],
   finishedProducts: [
-    { id: 1, name: "Classic Loaf", sku: "FG-LOAF-001", unit: "pcs", stock: 168, openingStock: 120, reorderLevel: 50, salePrice: 3.5 },
-    { id: 2, name: "Butter Cookies", sku: "FG-COOKIE-002", unit: "packs", stock: 34, openingStock: 19, reorderLevel: 40, salePrice: 5.75 },
-    { id: 3, name: "Celebration Cake", sku: "FG-CAKE-003", unit: "pcs", stock: 18, openingStock: 18, reorderLevel: 8, salePrice: 28 },
+    { id: 1, name: "Classic Loaf", sku: "FG-LOAF-001", unit: "pcs", stock: 168, openingStock: 120, reorderLevel: 50, salePrice: 3.5, active: true },
+    { id: 2, name: "Butter Cookies", sku: "FG-COOKIE-002", unit: "packs", stock: 34, openingStock: 19, reorderLevel: 40, salePrice: 5.75, active: true },
+    { id: 3, name: "Celebration Cake", sku: "FG-CAKE-003", unit: "pcs", stock: 18, openingStock: 18, reorderLevel: 8, salePrice: 28, active: true },
   ],
   customers: [
-    { id: 1, name: "Fresh Mart", phone: "+1 555 0142" },
-    { id: 2, name: "City Cafe", phone: "+1 555 0178" },
-    { id: 3, name: "Daily Grocers", phone: "+1 555 0194" },
+    { id: 1, name: "Fresh Mart", phone: "+1 555 0142", email: "orders@freshmart.test", active: true },
+    { id: 2, name: "City Cafe", phone: "+1 555 0178", email: "accounts@citycafe.test", active: true },
+    { id: 3, name: "Daily Grocers", phone: "+1 555 0194", email: "hello@dailygrocers.test", active: true },
   ],
   purchases: [
     { id: 1, ref: "PUR-0001", supplier: "Golden Grain Supplies", materialId: 1, quantity: 100, unitCost: 0.82, total: 82, date: "2026-08-01T08:15:00.000Z" },
@@ -150,131 +52,114 @@ const initialState: InventoryState = {
     { id: 1, ref: "SAL-0001", customerId: 1, productId: 1, quantity: 12, unitPrice: 3.5, total: 42, date: "2026-08-01T11:10:00.000Z" },
     { id: 2, ref: "SAL-0002", customerId: 2, productId: 2, quantity: 6, unitPrice: 5.75, total: 34.5, date: "2026-07-31T15:45:00.000Z" },
   ],
-  returns: [
-    { id: 1, ref: "RET-0001", customerId: 2, productId: 2, quantity: 1, unitPrice: 5.75, total: 5.75, date: "2026-08-01T14:00:00.000Z" },
-  ],
-  ledger: [
-    { id: 1, customerId: 1, type: "Sale", ref: "SAL-0001", debit: 42, credit: 0, date: "2026-08-01T11:10:00.000Z", note: "12 pcs Classic Loaf" },
-    { id: 2, customerId: 1, type: "Payment", ref: "PAY-0001", debit: 0, credit: 20, date: "2026-08-01T11:12:00.000Z", note: "Payment received" },
-    { id: 3, customerId: 2, type: "Sale", ref: "SAL-0002", debit: 34.5, credit: 0, date: "2026-07-31T15:45:00.000Z", note: "6 packs Butter Cookies" },
-    { id: 4, customerId: 2, type: "Return", ref: "RET-0001", debit: 0, credit: 5.75, date: "2026-08-01T14:00:00.000Z", note: "1 pack Butter Cookies returned" },
-  ],
-  stockMovements: [
-    { id: 1, stockType: "raw", itemId: 1, itemName: "Flour", type: "IN", quantity: 100, reason: "Purchase", ref: "PUR-0001", date: "2026-08-01T08:15:00.000Z" },
-    { id: 2, stockType: "raw", itemId: 1, itemName: "Flour", type: "OUT", quantity: 30, reason: "Production", ref: "PRD-0001", date: "2026-08-01T09:20:00.000Z" },
-    { id: 3, stockType: "finished", itemId: 1, itemName: "Classic Loaf", type: "IN", quantity: 60, reason: "Production", ref: "PRD-0001", date: "2026-08-01T09:20:00.000Z" },
-    { id: 4, stockType: "finished", itemId: 1, itemName: "Classic Loaf", type: "OUT", quantity: 12, reason: "Sale", ref: "SAL-0001", date: "2026-08-01T11:10:00.000Z" },
-    { id: 5, stockType: "finished", itemId: 2, itemName: "Butter Cookies", type: "IN", quantity: 1, reason: "Return", ref: "RET-0001", date: "2026-08-01T14:00:00.000Z" },
-    { id: 6, stockType: "raw", itemId: 4, itemName: "Packaging", type: "IN", quantity: 200, reason: "Purchase", ref: "PUR-0002", date: "2026-07-31T10:30:00.000Z" },
-    { id: 7, stockType: "raw", itemId: 3, itemName: "Butter", type: "OUT", quantity: 8, reason: "Production", ref: "PRD-0002", date: "2026-07-31T12:10:00.000Z" },
-    { id: 8, stockType: "finished", itemId: 2, itemName: "Butter Cookies", type: "IN", quantity: 20, reason: "Production", ref: "PRD-0002", date: "2026-07-31T12:10:00.000Z" },
-    { id: 9, stockType: "finished", itemId: 2, itemName: "Butter Cookies", type: "OUT", quantity: 6, reason: "Sale", ref: "SAL-0002", date: "2026-07-31T15:45:00.000Z" },
-  ],
-  transactions: [
-    { id: 1, type: "Purchase", ref: "PUR-0001", party: "Golden Grain Supplies", amount: 82, date: "2026-08-01T08:15:00.000Z" },
-    { id: 2, type: "Production", ref: "PRD-0001", party: "Classic Loaf", amount: 0, date: "2026-08-01T09:20:00.000Z" },
-    { id: 3, type: "Sale", ref: "SAL-0001", party: "Fresh Mart", amount: 42, date: "2026-08-01T11:10:00.000Z" },
-    { id: 4, type: "Payment", ref: "PAY-0001", party: "Fresh Mart", amount: 20, date: "2026-08-01T11:12:00.000Z" },
-    { id: 5, type: "Return", ref: "RET-0001", party: "City Cafe", amount: 5.75, date: "2026-08-01T14:00:00.000Z" },
-    { id: 6, type: "Purchase", ref: "PUR-0002", party: "PackRight Co.", amount: 24, date: "2026-07-31T10:30:00.000Z" },
-    { id: 7, type: "Production", ref: "PRD-0002", party: "Butter Cookies", amount: 0, date: "2026-07-31T12:10:00.000Z" },
-    { id: 8, type: "Sale", ref: "SAL-0002", party: "City Cafe", amount: 34.5, date: "2026-07-31T15:45:00.000Z" },
-  ],
+  returns: [{ id: 1, ref: "RET-0001", customerId: 2, productId: 2, quantity: 1, unitPrice: 5.75, total: 5.75, date: "2026-08-01T14:00:00.000Z" }],
+  payments: [{ id: 1, ref: "PAY-0001", customerId: 1, amount: 20, date: "2026-08-01T11:12:00.000Z", note: "Payment received" }],
+  ledger: [], stockMovements: [], transactions: [],
 };
 
 const nextId = (items: { id: number }[]) => Math.max(0, ...items.map((item) => item.id)) + 1;
 const makeRef = (prefix: string, id: number) => `${prefix}-${id.toString().padStart(4, "0")}`;
 
+function rebuildDerived(state: InventoryState) {
+  state.rawMaterials.forEach((item) => { item.stock = item.openingStock; });
+  state.finishedProducts.forEach((item) => { item.stock = item.openingStock; });
+  const movements: StockMovement[] = [];
+  const ledger: LedgerEntry[] = [];
+  const transactions: DailyTransaction[] = [];
+  let movementId = 1, ledgerId = 1, transactionId = 1;
+  state.purchases.forEach((row) => {
+    row.total = row.quantity * row.unitCost;
+    const material = state.rawMaterials.find((item) => item.id === row.materialId);
+    if (!material) return;
+    material.stock += row.quantity;
+    movements.push({ id: movementId++, stockType: "raw", itemId: material.id, itemName: material.name, type: "IN", quantity: row.quantity, reason: "Purchase", ref: row.ref, date: row.date });
+    transactions.push({ id: transactionId++, type: "Purchase", ref: row.ref, party: row.supplier, amount: row.total, date: row.date });
+  });
+  state.productions.forEach((row) => {
+    const material = state.rawMaterials.find((item) => item.id === row.materialId);
+    const product = state.finishedProducts.find((item) => item.id === row.productId);
+    if (!material || !product) return;
+    material.stock -= row.materialQuantity; product.stock += row.productQuantity;
+    movements.push({ id: movementId++, stockType: "raw", itemId: material.id, itemName: material.name, type: "OUT", quantity: row.materialQuantity, reason: "Production", ref: row.ref, date: row.date });
+    movements.push({ id: movementId++, stockType: "finished", itemId: product.id, itemName: product.name, type: "IN", quantity: row.productQuantity, reason: "Production", ref: row.ref, date: row.date });
+    transactions.push({ id: transactionId++, type: "Production", ref: row.ref, party: product.name, amount: 0, date: row.date });
+  });
+  state.sales.forEach((row) => {
+    row.total = row.quantity * row.unitPrice;
+    const product = state.finishedProducts.find((item) => item.id === row.productId);
+    const customer = state.customers.find((item) => item.id === row.customerId);
+    if (!product || !customer) return;
+    product.stock -= row.quantity;
+    movements.push({ id: movementId++, stockType: "finished", itemId: product.id, itemName: product.name, type: "OUT", quantity: row.quantity, reason: "Sale", ref: row.ref, date: row.date });
+    ledger.push({ id: ledgerId++, customerId: customer.id, type: "Sale", ref: row.ref, debit: row.total, credit: 0, date: row.date, note: `${row.quantity} ${product.unit} ${product.name}` });
+    transactions.push({ id: transactionId++, type: "Sale", ref: row.ref, party: customer.name, amount: row.total, date: row.date });
+  });
+  state.returns.forEach((row) => {
+    row.total = row.quantity * row.unitPrice;
+    const product = state.finishedProducts.find((item) => item.id === row.productId);
+    const customer = state.customers.find((item) => item.id === row.customerId);
+    if (!product || !customer) return;
+    product.stock += row.quantity;
+    movements.push({ id: movementId++, stockType: "finished", itemId: product.id, itemName: product.name, type: "IN", quantity: row.quantity, reason: "Return", ref: row.ref, date: row.date });
+    ledger.push({ id: ledgerId++, customerId: customer.id, type: "Return", ref: row.ref, debit: 0, credit: row.total, date: row.date, note: `${row.quantity} ${product.unit} ${product.name} returned` });
+    transactions.push({ id: transactionId++, type: "Return", ref: row.ref, party: customer.name, amount: row.total, date: row.date });
+  });
+  state.payments.forEach((row) => {
+    const customer = state.customers.find((item) => item.id === row.customerId);
+    if (!customer) return;
+    ledger.push({ id: ledgerId++, customerId: customer.id, type: "Payment", ref: row.ref, debit: 0, credit: row.amount, date: row.date, note: row.note });
+    transactions.push({ id: transactionId++, type: "Payment", ref: row.ref, party: customer.name, amount: row.amount, date: row.date });
+  });
+  const newest = <T extends { date: string }>(rows: T[]) => rows.sort((a, b) => b.date.localeCompare(a.date));
+  state.stockMovements = newest(movements); state.ledger = newest(ledger); state.transactions = newest(transactions);
+}
+
+rebuildDerived(initialState);
+
+type MaterialInput = Omit<RawMaterial, "id" | "stock"> & { stock?: number };
+type ProductInput = Omit<FinishedProduct, "id" | "stock"> & { stock?: number };
+
 const inventorySlice = createSlice({
-  name: "inventory",
-  initialState,
+  name: "inventory", initialState,
   reducers: {
-    hydrateInventory: (_state, action: PayloadAction<InventoryState>) => action.payload,
-    addRawMaterial: (state, action: PayloadAction<Omit<RawMaterial, "id" | "openingStock">>) => {
-      state.rawMaterials.push({ ...action.payload, id: nextId(state.rawMaterials), openingStock: action.payload.stock });
+    hydrateInventory: (_state, action: PayloadAction<InventoryState>) => {
+      const next = action.payload;
+      next.rawMaterials = (next.rawMaterials ?? []).map((x) => ({ ...x, active: x.active ?? true }));
+      next.finishedProducts = (next.finishedProducts ?? []).map((x) => ({ ...x, active: x.active ?? true }));
+      next.customers = (next.customers ?? []).map((x) => ({ ...x, email: x.email ?? "", active: x.active ?? true }));
+      next.payments ??= (next.ledger ?? []).filter((x) => x.type === "Payment").map((x, i) => ({ id: i + 1, ref: x.ref, customerId: x.customerId, amount: x.credit, date: x.date, note: x.note }));
+      rebuildDerived(next); return next;
     },
-    addFinishedProduct: (state, action: PayloadAction<Omit<FinishedProduct, "id" | "openingStock">>) => {
-      state.finishedProducts.push({ ...action.payload, id: nextId(state.finishedProducts), openingStock: action.payload.stock });
-    },
-    recordPurchase: (state, action: PayloadAction<{ supplier: string; materialId: number; quantity: number; unitCost: number; date: string }>) => {
-      const material = state.rawMaterials.find((item) => item.id === action.payload.materialId);
-      if (!material) return;
-      const id = nextId(state.purchases);
-      const ref = makeRef("PUR", id);
-      const total = action.payload.quantity * action.payload.unitCost;
-      material.stock += action.payload.quantity;
-      material.unitCost = action.payload.unitCost;
-      state.purchases.unshift({ id, ref, total, ...action.payload });
-      state.stockMovements.unshift({ id: nextId(state.stockMovements), stockType: "raw", itemId: material.id, itemName: material.name, type: "IN", quantity: action.payload.quantity, reason: "Purchase", ref, date: action.payload.date });
-      state.transactions.unshift({ id: nextId(state.transactions), type: "Purchase", ref, party: action.payload.supplier, amount: total, date: action.payload.date });
-    },
-    recordProduction: (state, action: PayloadAction<{ materialId: number; materialQuantity: number; productId: number; productQuantity: number; date: string }>) => {
-      const material = state.rawMaterials.find((item) => item.id === action.payload.materialId);
-      const product = state.finishedProducts.find((item) => item.id === action.payload.productId);
-      if (!material || !product || material.stock < action.payload.materialQuantity) return;
-      const id = nextId(state.productions);
-      const ref = makeRef("PRD", id);
-      material.stock -= action.payload.materialQuantity;
-      product.stock += action.payload.productQuantity;
-      state.productions.unshift({ id, ref, ...action.payload });
-      state.stockMovements.unshift(
-        { id: nextId(state.stockMovements), stockType: "finished", itemId: product.id, itemName: product.name, type: "IN", quantity: action.payload.productQuantity, reason: "Production", ref, date: action.payload.date },
-        { id: nextId(state.stockMovements) + 1, stockType: "raw", itemId: material.id, itemName: material.name, type: "OUT", quantity: action.payload.materialQuantity, reason: "Production", ref, date: action.payload.date },
-      );
-      state.transactions.unshift({ id: nextId(state.transactions), type: "Production", ref, party: product.name, amount: 0, date: action.payload.date });
-    },
-    recordSale: (state, action: PayloadAction<{ customerId: number; productId: number; quantity: number; unitPrice: number; payment: number; date: string }>) => {
-      const customer = state.customers.find((item) => item.id === action.payload.customerId);
-      const product = state.finishedProducts.find((item) => item.id === action.payload.productId);
-      if (!customer || !product || product.stock < action.payload.quantity) return;
-      const id = nextId(state.sales);
-      const ref = makeRef("SAL", id);
-      const total = action.payload.quantity * action.payload.unitPrice;
-      product.stock -= action.payload.quantity;
-      state.sales.unshift({ id, ref, customerId: customer.id, productId: product.id, quantity: action.payload.quantity, unitPrice: action.payload.unitPrice, total, date: action.payload.date });
-      state.stockMovements.unshift({ id: nextId(state.stockMovements), stockType: "finished", itemId: product.id, itemName: product.name, type: "OUT", quantity: action.payload.quantity, reason: "Sale", ref, date: action.payload.date });
-      state.ledger.unshift({ id: nextId(state.ledger), customerId: customer.id, type: "Sale", ref, debit: total, credit: 0, date: action.payload.date, note: `${action.payload.quantity} ${product.unit} ${product.name}` });
-      state.transactions.unshift({ id: nextId(state.transactions), type: "Sale", ref, party: customer.name, amount: total, date: action.payload.date });
-      if (action.payload.payment > 0) {
-        const paymentId = nextId(state.ledger);
-        const paymentRef = makeRef("PAY", paymentId);
-        state.ledger.unshift({ id: paymentId, customerId: customer.id, type: "Payment", ref: paymentRef, debit: 0, credit: action.payload.payment, date: action.payload.date, note: "Payment received with sale" });
-        state.transactions.unshift({ id: nextId(state.transactions), type: "Payment", ref: paymentRef, party: customer.name, amount: action.payload.payment, date: action.payload.date });
-      }
-    },
-    recordPayment: (state, action: PayloadAction<{ customerId: number; amount: number; date: string }>) => {
-      const customer = state.customers.find((item) => item.id === action.payload.customerId);
-      if (!customer) return;
-      const id = nextId(state.ledger);
-      const ref = makeRef("PAY", id);
-      state.ledger.unshift({ id, customerId: customer.id, type: "Payment", ref, debit: 0, credit: action.payload.amount, date: action.payload.date, note: "Customer payment received" });
-      state.transactions.unshift({ id: nextId(state.transactions), type: "Payment", ref, party: customer.name, amount: action.payload.amount, date: action.payload.date });
-    },
-    recordReturn: (state, action: PayloadAction<{ customerId: number; productId: number; quantity: number; unitPrice: number; date: string }>) => {
-      const customer = state.customers.find((item) => item.id === action.payload.customerId);
-      const product = state.finishedProducts.find((item) => item.id === action.payload.productId);
-      if (!customer || !product) return;
-      const id = nextId(state.returns);
-      const ref = makeRef("RET", id);
-      const total = action.payload.quantity * action.payload.unitPrice;
-      product.stock += action.payload.quantity;
-      state.returns.unshift({ id, ref, customerId: customer.id, productId: product.id, quantity: action.payload.quantity, unitPrice: action.payload.unitPrice, total, date: action.payload.date });
-      state.stockMovements.unshift({ id: nextId(state.stockMovements), stockType: "finished", itemId: product.id, itemName: product.name, type: "IN", quantity: action.payload.quantity, reason: "Return", ref, date: action.payload.date });
-      state.ledger.unshift({ id: nextId(state.ledger), customerId: customer.id, type: "Return", ref, debit: 0, credit: total, date: action.payload.date, note: `${action.payload.quantity} ${product.unit} ${product.name} returned` });
-      state.transactions.unshift({ id: nextId(state.transactions), type: "Return", ref, party: customer.name, amount: total, date: action.payload.date });
-    },
+    resetInventory: () => initialState,
+    addRawMaterial: (state, action: PayloadAction<Omit<RawMaterial, "id" | "stock" | "openingStock"> & { stock: number }>) => { state.rawMaterials.push({ ...action.payload, id: nextId(state.rawMaterials), openingStock: action.payload.stock, stock: action.payload.stock }); rebuildDerived(state); },
+    updateRawMaterial: (state, action: PayloadAction<{ id: number; changes: MaterialInput }>) => { const row = state.rawMaterials.find(x => x.id === action.payload.id); if (row) Object.assign(row, action.payload.changes); rebuildDerived(state); },
+    deleteRawMaterial: (state, action: PayloadAction<number>) => { state.rawMaterials = state.rawMaterials.filter(x => x.id !== action.payload); rebuildDerived(state); },
+    toggleRawMaterial: (state, action: PayloadAction<number>) => { const row = state.rawMaterials.find(x => x.id === action.payload); if (row) row.active = !row.active; },
+    addFinishedProduct: (state, action: PayloadAction<Omit<FinishedProduct, "id" | "stock" | "openingStock"> & { stock: number }>) => { state.finishedProducts.push({ ...action.payload, id: nextId(state.finishedProducts), openingStock: action.payload.stock, stock: action.payload.stock }); rebuildDerived(state); },
+    updateFinishedProduct: (state, action: PayloadAction<{ id: number; changes: ProductInput }>) => { const row = state.finishedProducts.find(x => x.id === action.payload.id); if (row) Object.assign(row, action.payload.changes); rebuildDerived(state); },
+    deleteFinishedProduct: (state, action: PayloadAction<number>) => { state.finishedProducts = state.finishedProducts.filter(x => x.id !== action.payload); rebuildDerived(state); },
+    toggleFinishedProduct: (state, action: PayloadAction<number>) => { const row = state.finishedProducts.find(x => x.id === action.payload); if (row) row.active = !row.active; },
+    addCustomer: (state, action: PayloadAction<Omit<Customer, "id">>) => { state.customers.push({ ...action.payload, id: nextId(state.customers) }); },
+    updateCustomer: (state, action: PayloadAction<Customer>) => { const row = state.customers.find(x => x.id === action.payload.id); if (row) Object.assign(row, action.payload); rebuildDerived(state); },
+    deleteCustomer: (state, action: PayloadAction<number>) => { state.customers = state.customers.filter(x => x.id !== action.payload); rebuildDerived(state); },
+    toggleCustomer: (state, action: PayloadAction<number>) => { const row = state.customers.find(x => x.id === action.payload); if (row) row.active = !row.active; },
+    recordPurchase: (state, action: PayloadAction<Omit<Purchase, "id" | "ref" | "total">>) => { const id = nextId(state.purchases); state.purchases.push({ ...action.payload, id, ref: makeRef("PUR", id), total: 0 }); rebuildDerived(state); },
+    updatePurchase: (state, action: PayloadAction<Purchase>) => { const row = state.purchases.find(x => x.id === action.payload.id); if (row) Object.assign(row, action.payload); rebuildDerived(state); },
+    deletePurchase: (state, action: PayloadAction<number>) => { state.purchases = state.purchases.filter(x => x.id !== action.payload); rebuildDerived(state); },
+    recordProduction: (state, action: PayloadAction<Omit<Production, "id" | "ref">>) => { const id = nextId(state.productions); state.productions.push({ ...action.payload, id, ref: makeRef("PRD", id) }); rebuildDerived(state); },
+    updateProduction: (state, action: PayloadAction<Production>) => { const row = state.productions.find(x => x.id === action.payload.id); if (row) Object.assign(row, action.payload); rebuildDerived(state); },
+    deleteProduction: (state, action: PayloadAction<number>) => { state.productions = state.productions.filter(x => x.id !== action.payload); rebuildDerived(state); },
+    recordSale: (state, action: PayloadAction<{ customerId: number; productId: number; quantity: number; unitPrice: number; payment: number; date: string }>) => { const id = nextId(state.sales); const ref = makeRef("SAL", id); const { payment, ...sale } = action.payload; state.sales.push({ ...sale, id, ref, total: 0 }); if (payment > 0) { const paymentId = nextId(state.payments); state.payments.push({ id: paymentId, ref: makeRef("PAY", paymentId), customerId: sale.customerId, amount: payment, date: sale.date, note: `Payment received with ${ref}` }); } rebuildDerived(state); },
+    updateSale: (state, action: PayloadAction<Sale>) => { const row = state.sales.find(x => x.id === action.payload.id); if (row) Object.assign(row, action.payload); rebuildDerived(state); },
+    deleteSale: (state, action: PayloadAction<number>) => { state.sales = state.sales.filter(x => x.id !== action.payload); rebuildDerived(state); },
+    recordPayment: (state, action: PayloadAction<{ customerId: number; amount: number; date: string }>) => { const id = nextId(state.payments); state.payments.push({ id, ref: makeRef("PAY", id), ...action.payload, note: "Customer payment received" }); rebuildDerived(state); },
+    updatePayment: (state, action: PayloadAction<Payment>) => { const row = state.payments.find(x => x.id === action.payload.id); if (row) Object.assign(row, action.payload); rebuildDerived(state); },
+    deletePayment: (state, action: PayloadAction<number>) => { state.payments = state.payments.filter(x => x.id !== action.payload); rebuildDerived(state); },
+    recordReturn: (state, action: PayloadAction<Omit<ProductReturn, "id" | "ref" | "total">>) => { const id = nextId(state.returns); state.returns.push({ ...action.payload, id, ref: makeRef("RET", id), total: 0 }); rebuildDerived(state); },
+    updateReturn: (state, action: PayloadAction<ProductReturn>) => { const row = state.returns.find(x => x.id === action.payload.id); if (row) Object.assign(row, action.payload); rebuildDerived(state); },
+    deleteReturn: (state, action: PayloadAction<number>) => { state.returns = state.returns.filter(x => x.id !== action.payload); rebuildDerived(state); },
   },
 });
 
-export const {
-  hydrateInventory,
-  addRawMaterial,
-  addFinishedProduct,
-  recordPurchase,
-  recordProduction,
-  recordSale,
-  recordPayment,
-  recordReturn,
-} = inventorySlice.actions;
-
+export const { hydrateInventory, resetInventory, addRawMaterial, updateRawMaterial, deleteRawMaterial, toggleRawMaterial, addFinishedProduct, updateFinishedProduct, deleteFinishedProduct, toggleFinishedProduct, addCustomer, updateCustomer, deleteCustomer, toggleCustomer, recordPurchase, updatePurchase, deletePurchase, recordProduction, updateProduction, deleteProduction, recordSale, updateSale, deleteSale, recordPayment, updatePayment, deletePayment, recordReturn, updateReturn, deleteReturn } = inventorySlice.actions;
 export default inventorySlice.reducer;

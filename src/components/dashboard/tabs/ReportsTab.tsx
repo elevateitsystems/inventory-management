@@ -1,16 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDownToLine, ArrowUpFromLine, CalendarDays, ClipboardList } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, CalendarDays, ClipboardList, Download } from "lucide-react";
 import { useAppSelector } from "@/store/hooks";
 import { formatCurrency, formatDateTime, getDateKey, getMonthKey } from "@/lib/inventory";
-import { inputClass } from "../Modal";
+import { inputClass, secondaryButtonClass } from "../Modal";
 import PageHeader from "../PageHeader";
+import { useToast } from "@/components/ui/ToastProvider";
 
 const today = new Date().toISOString().slice(0, 10);
 
 export default function ReportsTab() {
   const inventory = useAppSelector((state) => state.inventory);
+  const toast = useToast();
   const [reportDate, setReportDate] = useState(today);
   const [reportMonth, setReportMonth] = useState(today.slice(0, 7));
   const dailyTransactions = inventory.transactions.filter((item) => getDateKey(item.date) === reportDate);
@@ -28,9 +30,15 @@ export default function ReportsTab() {
     const movements = inventory.stockMovements.filter((movement) => movement.stockType === stockType && movement.itemId === item.id);
     return { ...item, stockIn: movements.filter((movement) => movement.type === "IN").reduce((sum, movement) => sum + movement.quantity, 0), stockOut: movements.filter((movement) => movement.type === "OUT").reduce((sum, movement) => sum + movement.quantity, 0) };
   });
+  const exportCsv = () => {
+    const rows = inventoryRows.map((item) => [item.sku, item.name, item.kind, item.openingStock, item.stockIn, item.stockOut, item.stock, item.unit]);
+    const csv = [["SKU", "Item", "Category", "Opening", "Stock IN", "Stock OUT", "Closing", "Unit"], ...rows].map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(",")).join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a"); link.href = url; link.download = `inventory-report-${today}.csv`; link.click(); URL.revokeObjectURL(url); toast("Inventory report downloaded.");
+  };
 
   return <div className="space-y-5">
-    <PageHeader title="Reports" description="Daily transactions, stock movements, monthly summaries, and inventory balances." />
+    <PageHeader title="Reports" description="Daily transactions, stock movements, monthly summaries, and inventory balances." action={<button onClick={exportCsv} className={secondaryButtonClass}><Download className="h-4 w-4" />Export inventory CSV</button>} />
     <div className="grid gap-5 xl:grid-cols-2">
       <ReportCard title="Daily Transactions" subtitle="All purchase, production, sale, payment, and return activity." icon={<CalendarDays className="h-5 w-5" />} control={<input type="date" value={reportDate} onChange={(event) => setReportDate(event.target.value)} className={`${inputClass} w-auto py-2`} />}>
         <div className="mb-4 grid grid-cols-3 gap-3"><MiniMetric label="Entries" value={dailyTransactions.length.toString()} /><MiniMetric label="Sales" value={formatCurrency(dailyTransactions.filter((item) => item.type === "Sale").reduce((sum, item) => sum + item.amount, 0))} /><MiniMetric label="Payments" value={formatCurrency(dailyTransactions.filter((item) => item.type === "Payment").reduce((sum, item) => sum + item.amount, 0))} /></div>

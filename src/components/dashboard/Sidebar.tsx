@@ -1,6 +1,11 @@
 "use client";
 
-import { BarChart3, Boxes, Factory, LayoutDashboard, PackageCheck, ReceiptText, ShoppingCart, Users, X } from "lucide-react";
+import { BarChart3, Boxes, Factory, LayoutDashboard, LogOut, PackageCheck, ReceiptText, RotateCcw, ShoppingCart, Users, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useAppDispatch } from "@/store/hooks";
+import { resetInventory } from "@/store/slices/inventorySlice";
+import { signOut } from "@/lib/mockAuth";
+import { useToast } from "@/components/ui/ToastProvider";
 
 interface SidebarProps {
   activeTab: string;
@@ -21,6 +26,9 @@ const menuItems = [
 ];
 
 export default function Sidebar({ activeTab, setActiveTab, mobile = false, onClose }: SidebarProps) {
+  const dispatch = useAppDispatch();
+  const router = useRouter();
+  const toast = useToast();
   const navigate = (tab: string) => {
     setActiveTab(tab);
     onClose?.();
@@ -73,6 +81,10 @@ export default function Sidebar({ activeTab, setActiveTab, mobile = false, onClo
         <div className="rounded-xl bg-white/5 p-3">
           <p className="text-xs font-semibold text-white">Inventory Admin</p>
           <p className="mt-0.5 text-[11px] text-slate-500">All operational records saved</p>
+          <div className="mt-3 flex gap-1 border-t border-white/10 pt-2">
+            <button onClick={() => { if (window.confirm("Reset all demo inventory data to the original sample records?")) { dispatch(resetInventory()); toast("Demo data reset."); } }} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[11px] text-slate-400 hover:bg-white/10 hover:text-white"><RotateCcw className="h-3.5 w-3.5" />Reset</button>
+            <button onClick={() => { signOut(); router.push("/login"); }} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[11px] text-slate-400 hover:bg-white/10 hover:text-white"><LogOut className="h-3.5 w-3.5" />Sign out</button>
+          </div>
         </div>
       </div>
     </aside>
