@@ -1,31 +1,290 @@
 "use client";
 
-import Link from "next/link";
-import { AlertTriangle, Boxes, Factory, LogIn, PackageCheck, ReceiptText, Users } from "lucide-react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  AlertTriangle,
+  Boxes,
+  Factory,
+  LogOut,
+  PackageCheck,
+  ReceiptText,
+  Users,
+} from "lucide-react";
 import { useAppSelector } from "@/store/hooks";
-import { formatCurrency, formatDateTime, getCustomerDue, getDateKey } from "@/lib/inventory";
+import {
+  formatCurrency,
+  formatDateTime,
+  getCustomerDue,
+  getDateKey,
+} from "@/lib/inventory";
+import { apiRequest } from "@/lib/api";
 import PageHeader from "../PageHeader";
+import { ButtonSpinner } from "../DataUI";
 
 export default function DashboardTab() {
+  const router = useRouter();
+  const [loggingOut, setLoggingOut] = useState(false);
   const inventory = useAppSelector((state) => state.inventory);
   const today = new Date().toISOString().slice(0, 10);
-  const todayTransactions = inventory.transactions.filter((item) => getDateKey(item.date) === today);
+  const todayTransactions = inventory.transactions.filter(
+    (item) => getDateKey(item.date) === today,
+  );
   const lowStock = [
-    ...inventory.rawMaterials.map((item) => ({ ...item, kind: "Raw material" })),
-    ...inventory.finishedProducts.map((item) => ({ ...item, kind: "Finished product" })),
+    ...inventory.rawMaterials.map((item) => ({
+      ...item,
+      kind: "Raw material",
+    })),
+    ...inventory.finishedProducts.map((item) => ({
+      ...item,
+      kind: "Finished product",
+    })),
   ].filter((item) => item.stock <= item.reorderLevel);
-  const outstanding = inventory.customers.reduce((sum, customer) => sum + Math.max(0, getCustomerDue(inventory.ledger, customer.id)), 0);
+  const outstanding = inventory.customers.reduce(
+    (sum, customer) =>
+      sum + Math.max(0, getCustomerDue(inventory.ledger, customer.id)),
+    0,
+  );
 
-  return <div className="space-y-5">
-    <PageHeader title="Inventory Dashboard" description="Live summary of purchasing, production, sales, stock, and customer dues." action={<div className="flex gap-2"><div className="flex min-h-10 items-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600">{new Intl.DateTimeFormat("en-US", { dateStyle: "long" }).format(new Date())}</div><Link href="/login" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"><LogIn className="h-4 w-4" />Sign in</Link></div>} />
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Stat label="Raw material stock" value={inventory.rawMaterials.reduce((sum, item) => sum + item.stock, 0).toLocaleString()} subtext={`${inventory.rawMaterials.length} material types`} icon={<Boxes className="h-5 w-5" />} color="indigo" /><Stat label="Finished product stock" value={inventory.finishedProducts.reduce((sum, item) => sum + item.stock, 0).toLocaleString()} subtext={`${inventory.finishedProducts.length} product types`} icon={<PackageCheck className="h-5 w-5" />} color="violet" /><Stat label="Today's sales" value={formatCurrency(todayTransactions.filter((item) => item.type === "Sale").reduce((sum, item) => sum + item.amount, 0))} subtext={`${todayTransactions.filter((item) => item.type === "Sale").length} invoices`} icon={<ReceiptText className="h-5 w-5" />} color="emerald" /><Stat label="Outstanding dues" value={formatCurrency(outstanding)} subtext={`${inventory.customers.length} customers`} icon={<Users className="h-5 w-5" />} color="rose" /></div>
-    <div className="grid gap-5 xl:grid-cols-[1.4fr_1fr]">
-      <section className="rounded-2xl border border-slate-200/80 bg-white shadow-sm"><div className="border-b border-slate-100 p-5"><h2 className="font-bold text-slate-900">Recent transactions</h2><p className="text-xs text-slate-500">Latest activity across the business.</p></div><div className="overflow-x-auto"><table className="w-full min-w-[680px] text-left"><thead className="bg-slate-50/80 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3">Type</th><th className="px-5 py-3">Reference</th><th className="px-5 py-3">Party / item</th><th className="px-5 py-3 text-right">Amount</th><th className="px-5 py-3">Date</th></tr></thead><tbody className="divide-y divide-slate-100">{inventory.transactions.slice(0, 7).map((item) => <tr key={item.id} className="text-sm hover:bg-slate-50/60"><td className="px-5 py-3.5"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${typeStyle[item.type]}`}>{item.type}</span></td><td className="px-5 py-3.5 font-medium text-slate-800">{item.ref}</td><td className="px-5 py-3.5 text-slate-600">{item.party}</td><td className="px-5 py-3.5 text-right font-semibold text-slate-900">{item.amount ? formatCurrency(item.amount) : "—"}</td><td className="px-5 py-3.5 text-slate-500">{formatDateTime(item.date)}</td></tr>)}</tbody></table></div></section>
-      <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm"><div className="mb-4 flex items-center justify-between"><div><h2 className="font-bold text-slate-900">Low stock alerts</h2><p className="text-xs text-slate-500">Items at or below reorder level.</p></div><div className="grid h-10 w-10 place-items-center rounded-xl bg-amber-50 text-amber-600"><AlertTriangle className="h-5 w-5" /></div></div><div className="space-y-2">{lowStock.map((item) => <div key={`${item.kind}-${item.id}`} className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/70 p-3"><div><p className="text-sm font-semibold text-slate-800">{item.name}</p><p className="text-xs text-slate-400">{item.kind} · Reorder at {item.reorderLevel}</p></div><span className="rounded-lg bg-amber-100 px-2.5 py-1 text-sm font-bold text-amber-700">{item.stock} {item.unit}</span></div>)}{!lowStock.length && <div className="py-10 text-center text-sm text-slate-400">All stock levels are healthy.</div>}</div></section>
+  return (
+    <div className="space-y-5">
+      <PageHeader
+        title="Inventory Dashboard"
+        description="Live summary of purchasing, production, sales, stock, and customer dues."
+        action={
+          <div className="flex gap-2">
+            <div className="flex min-h-10 items-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600">
+              {new Intl.DateTimeFormat("en-US", { dateStyle: "long" }).format(
+                new Date(),
+              )}
+            </div>
+            <button
+              disabled={loggingOut}
+              aria-busy={loggingOut}
+              onClick={async () => {
+                if (loggingOut) return;
+                setLoggingOut(true);
+                try {
+                  await apiRequest("/api/auth/logout", { method: "POST" });
+                } finally {
+                  router.push("/login");
+                  router.refresh();
+                }
+              }}
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loggingOut ? <ButtonSpinner /> : <LogOut className="h-4 w-4" />}
+              {loggingOut ? "Logging out..." : "Logout"}
+            </button>
+          </div>
+        }
+      />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Stat
+          label="Raw material stock"
+          value={inventory.rawMaterials
+            .reduce((sum, item) => sum + item.stock, 0)
+            .toLocaleString()}
+          subtext={`${inventory.rawMaterials.length} material types`}
+          icon={<Boxes className="h-5 w-5" />}
+          color="indigo"
+        />
+        <Stat
+          label="Finished product stock"
+          value={inventory.finishedProducts
+            .reduce((sum, item) => sum + item.stock, 0)
+            .toLocaleString()}
+          subtext={`${inventory.finishedProducts.length} product types`}
+          icon={<PackageCheck className="h-5 w-5" />}
+          color="violet"
+        />
+        <Stat
+          label="Today's sales"
+          value={formatCurrency(
+            todayTransactions
+              .filter((item) => item.type === "Sale")
+              .reduce((sum, item) => sum + item.amount, 0),
+          )}
+          subtext={`${todayTransactions.filter((item) => item.type === "Sale").length} invoices`}
+          icon={<ReceiptText className="h-5 w-5" />}
+          color="emerald"
+        />
+        <Stat
+          label="Outstanding dues"
+          value={formatCurrency(outstanding)}
+          subtext={`${inventory.customers.length} customers`}
+          icon={<Users className="h-5 w-5" />}
+          color="rose"
+        />
+      </div>
+      <div className="grid gap-5 xl:grid-cols-[1.4fr_1fr]">
+        <section className="rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+          <div className="border-b border-slate-100 p-5">
+            <h2 className="font-bold text-slate-900">Recent transactions</h2>
+            <p className="text-xs text-slate-500">
+              Latest activity across the business.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[680px] text-left">
+              <thead className="bg-slate-50/80 text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-5 py-3">Type</th>
+                  <th className="px-5 py-3">Reference</th>
+                  <th className="px-5 py-3">Party / item</th>
+                  <th className="px-5 py-3 text-right">Amount</th>
+                  <th className="px-5 py-3">Date</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {inventory.transactions.slice(0, 7).map((item) => (
+                  <tr key={item.id} className="text-sm hover:bg-slate-50/60">
+                    <td className="px-5 py-3.5">
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${typeStyle[item.type]}`}
+                      >
+                        {item.type}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5 font-medium text-slate-800">
+                      {item.ref}
+                    </td>
+                    <td className="px-5 py-3.5 text-slate-600">{item.party}</td>
+                    <td className="px-5 py-3.5 text-right font-semibold text-slate-900">
+                      {item.amount ? formatCurrency(item.amount) : "—"}
+                    </td>
+                    <td className="px-5 py-3.5 text-slate-500">
+                      {formatDateTime(item.date)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h2 className="font-bold text-slate-900">Low stock alerts</h2>
+              <p className="text-xs text-slate-500">
+                Items at or below reorder level.
+              </p>
+            </div>
+            <div className="grid h-10 w-10 place-items-center rounded-xl bg-amber-50 text-amber-600">
+              <AlertTriangle className="h-5 w-5" />
+            </div>
+          </div>
+          <div className="space-y-2">
+            {lowStock.map((item) => (
+              <div
+                key={`${item.kind}-${item.id}`}
+                className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/70 p-3"
+              >
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">
+                    {item.name}
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    {item.kind} · Reorder at {item.reorderLevel}
+                  </p>
+                </div>
+                <span className="rounded-lg bg-amber-100 px-2.5 py-1 text-sm font-bold text-amber-700">
+                  {item.stock} {item.unit}
+                </span>
+              </div>
+            ))}
+            {!lowStock.length && (
+              <div className="py-10 text-center text-sm text-slate-400">
+                All stock levels are healthy.
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
+      <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+        <div className="mb-4 flex items-center gap-3">
+          <div className="grid h-10 w-10 place-items-center rounded-xl bg-indigo-50 text-indigo-600">
+            <Factory className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className="font-bold text-slate-900">Recent stock movement</h2>
+            <p className="text-xs text-slate-500">
+              Audit trail for stock entering and leaving inventory.
+            </p>
+          </div>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {inventory.stockMovements.slice(0, 8).map((item) => (
+            <div
+              key={item.id}
+              className="rounded-xl border border-slate-100 p-3"
+            >
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">
+                    {item.itemName}
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    {item.reason} · {item.ref}
+                  </p>
+                </div>
+                <span
+                  className={`text-sm font-bold ${item.type === "IN" ? "text-emerald-600" : "text-rose-600"}`}
+                >
+                  {item.type === "IN" ? "+" : "-"}
+                  {item.quantity}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
-    <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm"><div className="mb-4 flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl bg-indigo-50 text-indigo-600"><Factory className="h-5 w-5" /></div><div><h2 className="font-bold text-slate-900">Recent stock movement</h2><p className="text-xs text-slate-500">Audit trail for stock entering and leaving inventory.</p></div></div><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{inventory.stockMovements.slice(0, 8).map((item) => <div key={item.id} className="rounded-xl border border-slate-100 p-3"><div className="flex items-start justify-between"><div><p className="text-sm font-semibold text-slate-800">{item.itemName}</p><p className="text-xs text-slate-400">{item.reason} · {item.ref}</p></div><span className={`text-sm font-bold ${item.type === "IN" ? "text-emerald-600" : "text-rose-600"}`}>{item.type === "IN" ? "+" : "-"}{item.quantity}</span></div></div>)}</div></section>
-  </div>;
+  );
 }
 
-const typeStyle = { Purchase: "bg-blue-100 text-blue-700", Production: "bg-violet-100 text-violet-700", Sale: "bg-indigo-100 text-indigo-700", Payment: "bg-emerald-100 text-emerald-700", Return: "bg-amber-100 text-amber-700" };
-function Stat({ label, value, subtext, icon, color }: { label: string; value: string; subtext: string; icon: React.ReactNode; color: "indigo" | "violet" | "emerald" | "rose" }) { const colors = { indigo: "bg-indigo-50 text-indigo-600", violet: "bg-violet-50 text-violet-600", emerald: "bg-emerald-50 text-emerald-600", rose: "bg-rose-50 text-rose-600" }; return <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm"><div className="flex items-start justify-between"><div><p className="text-sm font-medium text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold tracking-tight text-slate-950">{value}</p></div><div className={`grid h-11 w-11 place-items-center rounded-xl ${colors[color]}`}>{icon}</div></div><p className="mt-3 text-xs text-slate-400">{subtext}</p></div>; }
+const typeStyle = {
+  Purchase: "bg-blue-100 text-blue-700",
+  Production: "bg-violet-100 text-violet-700",
+  Sale: "bg-indigo-100 text-indigo-700",
+  Payment: "bg-emerald-100 text-emerald-700",
+  Return: "bg-amber-100 text-amber-700",
+};
+function Stat({
+  label,
+  value,
+  subtext,
+  icon,
+  color,
+}: {
+  label: string;
+  value: string;
+  subtext: string;
+  icon: React.ReactNode;
+  color: "indigo" | "violet" | "emerald" | "rose";
+}) {
+  const colors = {
+    indigo: "bg-indigo-50 text-indigo-600",
+    violet: "bg-violet-50 text-violet-600",
+    emerald: "bg-emerald-50 text-emerald-600",
+    rose: "bg-rose-50 text-rose-600",
+  };
+  return (
+    <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-sm font-medium text-slate-500">{label}</p>
+          <p className="mt-1 text-2xl font-bold tracking-tight text-slate-950">
+            {value}
+          </p>
+        </div>
+        <div
+          className={`grid h-11 w-11 place-items-center rounded-xl ${colors[color]}`}
+        >
+          {icon}
+        </div>
+      </div>
+      <p className="mt-3 text-xs text-slate-400">{subtext}</p>
+    </div>
+  );
+}

@@ -1,22 +1,476 @@
 "use client";
+import { getErrorMessage } from "@/lib/api";
 
 import { useMemo, useState, type FormEvent } from "react";
-import { AlertTriangle, ArrowUpDown, Boxes, Pencil, Plus, Search, Trash2 } from "lucide-react";
-import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { addFinishedProduct, deleteFinishedProduct, toggleFinishedProduct, updateFinishedProduct, type FinishedProduct } from "@/store/slices/inventorySlice";
-import { formatCurrency } from "@/lib/inventory";
+import {
+  AlertTriangle,
+  ArrowUpDown,
+  Boxes,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+} from "lucide-react";
+import {
+  useAppDispatch,
+  useAppSelector,
+  useInventoryBusy,
+} from "@/store/hooks";
+import {
+  addFinishedProduct,
+  deleteFinishedProduct,
+  toggleFinishedProduct,
+  updateFinishedProduct,
+  type FinishedProduct,
+} from "@/store/slices/inventorySlice";
+import {
+  findCreatedRecord,
+  formatCurrency,
+  pageContainingRecord,
+} from "@/lib/inventory";
 import { useToast } from "@/components/ui/ToastProvider";
-import Modal, { FormField, inputClass, primaryButtonClass, secondaryButtonClass } from "../Modal";
-import { ConfirmDialog, EmptyState, iconButtonClass, Pagination } from "../DataUI";
+import Modal, {
+  FormField,
+  inputClass,
+  primaryButtonClass,
+  secondaryButtonClass,
+} from "../Modal";
+import {
+  ButtonSpinner,
+  ConfirmDialog,
+  EmptyState,
+  iconButtonClass,
+  Pagination,
+} from "../DataUI";
 import PageHeader from "../PageHeader";
 
-const PAGE_SIZE=5;
-export default function ProductsTab(){const dispatch=useAppDispatch(),toast=useToast();const{finishedProducts:products,productions,sales,returns}=useAppSelector(s=>s.inventory);const[search,setSearch]=useState("");const[status,setStatus]=useState("all");const[sort,setSort]=useState<"name"|"stock">("name");const[page,setPage]=useState(1);const[editing,setEditing]=useState<FinishedProduct|"new"|null>(null);const[deleting,setDeleting]=useState<FinishedProduct|null>(null);
-const rows=useMemo(()=>products.filter(x=>`${x.name} ${x.sku}`.toLowerCase().includes(search.toLowerCase())&&(status==="all"||(status==="active")===x.active)).sort((a,b)=>sort==="name"?a.name.localeCompare(b.name):b.stock-a.stock),[products,search,status,sort]);const pages=Math.max(1,Math.ceil(rows.length/PAGE_SIZE)),current=Math.min(page,pages),visible=rows.slice((current-1)*PAGE_SIZE,current*PAGE_SIZE);
-const submit=(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();const d=new FormData(e.currentTarget),sku=String(d.get("sku")).trim();if(products.some(x=>x.sku.toLowerCase()===sku.toLowerCase()&&x.id!==(editing==="new"?-1:editing?.id)))return toast("SKU must be unique.","error");const payload={name:String(d.get("name")).trim(),sku,unit:String(d.get("unit")),reorderLevel:Number(d.get("reorderLevel")),salePrice:Number(d.get("salePrice")),active:d.get("active")==="on"};if(editing==="new")dispatch(addFinishedProduct({...payload,stock:Number(d.get("stock"))}));else if(editing)dispatch(updateFinishedProduct({id:editing.id,changes:{...payload,openingStock:Number(d.get("stock"))}}));toast(editing==="new"?"Finished product created.":"Finished product updated.");setEditing(null)};
-const remove=()=>{if(!deleting)return;const used=productions.some(x=>x.productId===deleting.id)||sales.some(x=>x.productId===deleting.id)||returns.some(x=>x.productId===deleting.id);if(used){toast("This product has transaction history and cannot be deleted. Set it inactive instead.","error");setDeleting(null);return}dispatch(deleteFinishedProduct(deleting.id));toast("Finished product deleted.");setDeleting(null)};
-return <div className="space-y-5"><PageHeader title="Finished Products" description="Manage saleable products and current finished-goods stock." action={<button onClick={()=>setEditing("new")} className={primaryButtonClass}><Plus className="h-4 w-4"/>Add product</button>}/><div className="grid gap-4 sm:grid-cols-3"><Summary label="Product types" value={products.length.toString()} icon={<Boxes className="h-5 w-5"/>}/><Summary label="Finished stock" value={products.reduce((s,x)=>s+x.stock,0).toLocaleString()} icon={<Boxes className="h-5 w-5"/>}/><Summary label="Below reorder level" value={products.filter(x=>x.active&&x.stock<=x.reorderLevel).length.toString()} icon={<AlertTriangle className="h-5 w-5"/>} warning/></div>
-<section className="rounded-2xl border border-slate-200/80 bg-white shadow-sm"><div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:p-5"><div className="relative flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/><input value={search} onChange={e=>{setSearch(e.target.value);setPage(1)}} placeholder="Search product or SKU" className={`${inputClass} pl-9`}/></div><select value={status} onChange={e=>{setStatus(e.target.value);setPage(1)}} className={`${inputClass} sm:w-40`}><option value="all">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select><button onClick={()=>setSort(sort==="name"?"stock":"name")} className={secondaryButtonClass}><ArrowUpDown className="h-4 w-4"/>Sort: {sort}</button></div><div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left"><thead className="bg-slate-50/80 text-xs uppercase text-slate-500"><tr><th className="px-5 py-3">Product</th><th className="px-5 py-3">Available</th><th className="px-5 py-3">Reorder</th><th className="px-5 py-3">Sale price</th><th className="px-5 py-3">Stock</th><th className="px-5 py-3">Status</th><th className="px-5 py-3 text-right">Actions</th></tr></thead><tbody className="divide-y divide-slate-100">{visible.map(x=>{const low=x.stock<=x.reorderLevel;return <tr key={x.id} className="text-sm hover:bg-slate-50"><td className="px-5 py-4"><p className="font-semibold">{x.name}</p><p className="text-xs text-slate-400">{x.sku} · {x.unit}</p></td><td className="px-5 py-4 font-semibold">{x.stock.toLocaleString()} {x.unit}</td><td className="px-5 py-4">{x.reorderLevel}</td><td className="px-5 py-4">{formatCurrency(x.salePrice)}</td><td className="px-5 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${low?"bg-amber-100 text-amber-700":"bg-emerald-100 text-emerald-700"}`}>{x.stock===0?"Out of stock":low?"Low stock":"In stock"}</span></td><td className="px-5 py-4"><button onClick={()=>{dispatch(toggleFinishedProduct(x.id));toast(`Product marked ${x.active?"inactive":"active"}.`)}} className={`rounded-full px-2.5 py-1 text-xs font-semibold ${x.active?"bg-indigo-100 text-indigo-700":"bg-slate-100 text-slate-500"}`}>{x.active?"Active":"Inactive"}</button></td><td className="px-5 py-4"><div className="flex justify-end"><button onClick={()=>setEditing(x)} className={iconButtonClass} aria-label={`Edit ${x.name}`}><Pencil className="h-4 w-4"/></button><button onClick={()=>setDeleting(x)} className={`${iconButtonClass} hover:text-rose-600`} aria-label={`Delete ${x.name}`}><Trash2 className="h-4 w-4"/></button></div></td></tr>})}</tbody></table>{!visible.length&&<EmptyState/>}</div><Pagination page={current} pages={pages} total={rows.length} onChange={setPage}/></section>
-{editing&&<Modal title={editing==="new"?"Add finished product":"Edit finished product"} description="Opening stock stays reconciled with production, sales, and returns." onClose={()=>setEditing(null)}><ProductForm item={editing==="new"?undefined:editing} onSubmit={submit} onCancel={()=>setEditing(null)}/></Modal>}{deleting&&<ConfirmDialog description={`Delete ${deleting.name}? This cannot be undone.`} onCancel={()=>setDeleting(null)} onConfirm={remove}/>}</div>}
-function ProductForm({item,onSubmit,onCancel}:{item?:FinishedProduct;onSubmit:(e:FormEvent<HTMLFormElement>)=>void;onCancel:()=>void}){return <form onSubmit={onSubmit} className="grid gap-4 sm:grid-cols-2"><FormField label="Product name"><input name="name" required minLength={2} defaultValue={item?.name} className={inputClass}/></FormField><FormField label="SKU"><input name="sku" required defaultValue={item?.sku} className={inputClass}/></FormField><FormField label="Unit"><select name="unit" defaultValue={item?.unit??"pcs"} className={inputClass}><option>pcs</option><option>packs</option><option>boxes</option><option>kg</option></select></FormField><FormField label="Opening stock"><input name="stock" required min="0" step="0.01" type="number" defaultValue={item?.openingStock??0} className={inputClass}/></FormField><FormField label="Reorder level"><input name="reorderLevel" required min="0" step="0.01" type="number" defaultValue={item?.reorderLevel??0} className={inputClass}/></FormField><FormField label="Sale price"><input name="salePrice" required min="0" step="0.01" type="number" defaultValue={item?.salePrice??0} className={inputClass}/></FormField><label className="flex items-center gap-2 text-sm text-slate-600 sm:col-span-2"><input name="active" type="checkbox" defaultChecked={item?.active??true} className="accent-indigo-600"/>Active and available for transactions</label><div className="flex justify-end gap-3 sm:col-span-2"><button type="button" onClick={onCancel} className={secondaryButtonClass}>Cancel</button><button className={primaryButtonClass}>Save product</button></div></form>}
-function Summary({label,value,icon,warning=false}:{label:string;value:string;icon:React.ReactNode;warning?:boolean}){return <div className="flex items-center gap-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm"><div className={`grid h-11 w-11 place-items-center rounded-xl ${warning?"bg-amber-50 text-amber-600":"bg-violet-50 text-violet-600"}`}>{icon}</div><div><p className="text-sm text-slate-500">{label}</p><p className="text-xl font-bold">{value}</p></div></div>}
+const PAGE_SIZE = 5;
+export default function ProductsTab() {
+  const dispatch = useAppDispatch(),
+    toast = useToast();
+  const busy = useInventoryBusy();
+  const {
+    finishedProducts: products,
+    productions,
+    sales,
+    returns,
+  } = useAppSelector((s) => s.inventory);
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("all");
+  const [sort, setSort] = useState<"name" | "stock">("name");
+  const [page, setPage] = useState(1);
+  const [editing, setEditing] = useState<FinishedProduct | "new" | null>(null);
+  const [deleting, setDeleting] = useState<FinishedProduct | null>(null);
+  const rows = useMemo(
+    () =>
+      products
+        .filter(
+          (x) =>
+            `${x.name} ${x.sku}`.toLowerCase().includes(search.toLowerCase()) &&
+            (status === "all" || (status === "active") === x.active),
+        )
+        .sort((a, b) =>
+          sort === "name" ? a.name.localeCompare(b.name) : b.stock - a.stock,
+        ),
+    [products, search, status, sort],
+  );
+  const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE)),
+    current = Math.min(page, pages),
+    visible = rows.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
+  const submit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const d = new FormData(e.currentTarget),
+      sku = String(d.get("sku")).trim();
+    if (
+      products.some(
+        (x) =>
+          x.sku.toLowerCase() === sku.toLowerCase() &&
+          x.id !== (editing === "new" ? -1 : editing?.id),
+      )
+    )
+      return toast("SKU must be unique.", "error");
+    const payload = {
+      name: String(d.get("name")).trim(),
+      sku,
+      unit: String(d.get("unit")),
+      reorderLevel: Number(d.get("reorderLevel")),
+      salePrice: Number(d.get("salePrice")),
+      active: d.get("active") === "on",
+    };
+    try {
+      if (editing === "new") {
+        const updated = await dispatch(
+          addFinishedProduct({ ...payload, stock: Number(d.get("stock")) }),
+        ).unwrap();
+        const created = findCreatedRecord(products, updated.finishedProducts);
+        if (created) {
+          const ordered = [...updated.finishedProducts].sort((a, b) =>
+            sort === "name" ? a.name.localeCompare(b.name) : b.stock - a.stock,
+          );
+          setSearch("");
+          setStatus("all");
+          setPage(pageContainingRecord(ordered, created.id, PAGE_SIZE));
+        }
+      } else if (editing)
+        await dispatch(
+          updateFinishedProduct({
+            id: editing.id,
+            changes: { ...payload, openingStock: Number(d.get("stock")) },
+          }),
+        ).unwrap();
+      toast(
+        editing === "new"
+          ? "Finished product created."
+          : "Finished product updated.",
+      );
+      setEditing(null);
+    } catch (reason) {
+      toast(getErrorMessage(reason, "Unable to save product."), "error");
+    }
+  };
+  const remove = async () => {
+    if (!deleting) return;
+    const used =
+      productions.some((x) => x.productId === deleting.id) ||
+      sales.some((x) => x.productId === deleting.id) ||
+      returns.some((x) => x.productId === deleting.id);
+    if (used) {
+      toast(
+        "This product has transaction history and cannot be deleted. Set it inactive instead.",
+        "error",
+      );
+      setDeleting(null);
+      return;
+    }
+    try {
+      await dispatch(deleteFinishedProduct(deleting.id)).unwrap();
+      toast("Finished product deleted.");
+      setDeleting(null);
+    } catch (reason) {
+      toast(getErrorMessage(reason, "Unable to delete product."), "error");
+    }
+  };
+  return (
+    <div className="space-y-5">
+      <PageHeader
+        title="Finished Products"
+        description="Manage saleable products and current finished-goods stock."
+        action={
+          <button
+            onClick={() => setEditing("new")}
+            className={primaryButtonClass}
+          >
+            <Plus className="h-4 w-4" />
+            Add product
+          </button>
+        }
+      />
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Summary
+          label="Product types"
+          value={products.length.toString()}
+          icon={<Boxes className="h-5 w-5" />}
+        />
+        <Summary
+          label="Finished stock"
+          value={products.reduce((s, x) => s + x.stock, 0).toLocaleString()}
+          icon={<Boxes className="h-5 w-5" />}
+        />
+        <Summary
+          label="Below reorder level"
+          value={products
+            .filter((x) => x.active && x.stock <= x.reorderLevel)
+            .length.toString()}
+          icon={<AlertTriangle className="h-5 w-5" />}
+          warning
+        />
+      </div>
+      <section className="rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+        <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:p-5">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              placeholder="Search product or SKU"
+              className={`${inputClass} pl-9`}
+            />
+          </div>
+          <select
+            value={status}
+            onChange={(e) => {
+              setStatus(e.target.value);
+              setPage(1);
+            }}
+            className={`${inputClass} sm:w-40`}
+          >
+            <option value="all">All statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+          <button
+            onClick={() => setSort(sort === "name" ? "stock" : "name")}
+            className={secondaryButtonClass}
+          >
+            <ArrowUpDown className="h-4 w-4" />
+            Sort: {sort}
+          </button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[900px] text-left">
+            <thead className="bg-slate-50/80 text-xs uppercase text-slate-500">
+              <tr>
+                <th className="px-5 py-3">Product</th>
+                <th className="px-5 py-3">Available</th>
+                <th className="px-5 py-3">Reorder</th>
+                <th className="px-5 py-3">Sale price</th>
+                <th className="px-5 py-3">Stock</th>
+                <th className="px-5 py-3">Status</th>
+                <th className="px-5 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {visible.map((x) => {
+                const low = x.stock <= x.reorderLevel;
+                return (
+                  <tr key={x.id} className="text-sm hover:bg-slate-50">
+                    <td className="px-5 py-4">
+                      <p className="font-semibold">{x.name}</p>
+                      <p className="text-xs text-slate-400">
+                        {x.sku} · {x.unit}
+                      </p>
+                    </td>
+                    <td className="px-5 py-4 font-semibold">
+                      {x.stock.toLocaleString()} {x.unit}
+                    </td>
+                    <td className="px-5 py-4">{x.reorderLevel}</td>
+                    <td className="px-5 py-4">{formatCurrency(x.salePrice)}</td>
+                    <td className="px-5 py-4">
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${low ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}
+                      >
+                        {x.stock === 0
+                          ? "Out of stock"
+                          : low
+                            ? "Low stock"
+                            : "In stock"}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4">
+                      <button
+                        disabled={busy}
+                        aria-busy={busy}
+                        onClick={async () => {
+                          try {
+                            await dispatch(
+                              toggleFinishedProduct(x.id),
+                            ).unwrap();
+                            toast(
+                              `Product marked ${x.active ? "inactive" : "active"}.`,
+                            );
+                          } catch (reason) {
+                            toast(
+                              getErrorMessage(
+                                reason,
+                                "Unable to update product.",
+                              ),
+                              "error",
+                            );
+                          }
+                        }}
+                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${x.active ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-500"}`}
+                      >
+                        {busy ? (
+                          <ButtonSpinner />
+                        ) : x.active ? (
+                          "Active"
+                        ) : (
+                          "Inactive"
+                        )}
+                      </button>
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex justify-end">
+                        <button
+                          onClick={() => setEditing(x)}
+                          className={iconButtonClass}
+                          aria-label={`Edit ${x.name}`}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => setDeleting(x)}
+                          className={`${iconButtonClass} hover:text-rose-600`}
+                          aria-label={`Delete ${x.name}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {!visible.length && <EmptyState />}
+        </div>
+        <Pagination
+          page={current}
+          pages={pages}
+          total={rows.length}
+          onChange={setPage}
+        />
+      </section>
+      {editing && (
+        <Modal
+          title={
+            editing === "new" ? "Add finished product" : "Edit finished product"
+          }
+          description="Opening stock stays reconciled with production, sales, and returns."
+          onClose={() => setEditing(null)}
+        >
+          <ProductForm
+            item={editing === "new" ? undefined : editing}
+            onSubmit={submit}
+            onCancel={() => setEditing(null)}
+          />
+        </Modal>
+      )}
+      {deleting && (
+        <ConfirmDialog
+          description={`Delete ${deleting.name}? This cannot be undone.`}
+          onCancel={() => setDeleting(null)}
+          onConfirm={remove}
+        />
+      )}
+    </div>
+  );
+}
+function ProductForm({
+  item,
+  onSubmit,
+  onCancel,
+}: {
+  item?: FinishedProduct;
+  onSubmit: (e: FormEvent<HTMLFormElement>) => void;
+  onCancel: () => void;
+}) {
+  const busy = useInventoryBusy();
+  return (
+    <form onSubmit={onSubmit} className="grid gap-4 sm:grid-cols-2">
+      <FormField label="Product name">
+        <input
+          name="name"
+          required
+          minLength={2}
+          defaultValue={item?.name}
+          className={inputClass}
+        />
+      </FormField>
+      <FormField label="SKU">
+        <input
+          name="sku"
+          required
+          defaultValue={item?.sku}
+          className={inputClass}
+        />
+      </FormField>
+      <FormField label="Unit">
+        <select
+          name="unit"
+          defaultValue={item?.unit ?? "pcs"}
+          className={inputClass}
+        >
+          <option>pcs</option>
+          <option>packs</option>
+          <option>boxes</option>
+          <option>kg</option>
+        </select>
+      </FormField>
+      <FormField label="Opening stock">
+        <input
+          name="stock"
+          required
+          min="0"
+          step="0.01"
+          type="number"
+          defaultValue={item?.openingStock ?? 0}
+          className={inputClass}
+        />
+      </FormField>
+      <FormField label="Reorder level">
+        <input
+          name="reorderLevel"
+          required
+          min="0"
+          step="0.01"
+          type="number"
+          defaultValue={item?.reorderLevel ?? 0}
+          className={inputClass}
+        />
+      </FormField>
+      <FormField label="Sale price">
+        <input
+          name="salePrice"
+          required
+          min="0"
+          step="0.01"
+          type="number"
+          defaultValue={item?.salePrice ?? 0}
+          className={inputClass}
+        />
+      </FormField>
+      <label className="flex items-center gap-2 text-sm text-slate-600 sm:col-span-2">
+        <input
+          name="active"
+          type="checkbox"
+          defaultChecked={item?.active ?? true}
+          className="accent-indigo-600"
+        />
+        Active and available for transactions
+      </label>
+      <div className="flex justify-end gap-3 sm:col-span-2">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onCancel}
+          className={secondaryButtonClass}
+        >
+          Cancel
+        </button>
+        <button disabled={busy} aria-busy={busy} className={primaryButtonClass}>
+          {busy && <ButtonSpinner />}
+          {busy ? "Saving..." : "Save product"}
+        </button>
+      </div>
+    </form>
+  );
+}
+function Summary({
+  label,
+  value,
+  icon,
+  warning = false,
+}: {
+  label: string;
+  value: string;
+  icon: React.ReactNode;
+  warning?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+      <div
+        className={`grid h-11 w-11 place-items-center rounded-xl ${warning ? "bg-amber-50 text-amber-600" : "bg-violet-50 text-violet-600"}`}
+      >
+        {icon}
+      </div>
+      <div>
+        <p className="text-sm text-slate-500">{label}</p>
+        <p className="text-xl font-bold">{value}</p>
+      </div>
+    </div>
+  );
+}
