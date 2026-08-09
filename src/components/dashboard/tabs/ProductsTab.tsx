@@ -39,7 +39,6 @@ import {
   ButtonSpinner,
   ConfirmDialog,
   EmptyState,
-  iconButtonClass,
   Pagination,
 } from "../DataUI";
 import PageHeader from "../PageHeader";
@@ -293,20 +292,24 @@ export default function ProductsTab() {
                       </button>
                     </td>
                     <td className="px-5 py-4">
-                      <div className="flex justify-end">
+                      <div className="flex items-center justify-end gap-1">
                         <button
+                          type="button"
                           onClick={() => setEditing(x)}
-                          className={iconButtonClass}
+                          className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-indigo-600 transition hover:bg-indigo-50"
                           aria-label={`Edit ${x.name}`}
                         >
-                          <Pencil className="h-4 w-4" />
+                          <Pencil className="h-3.5 w-3.5" />
+                          Edit
                         </button>
                         <button
+                          type="button"
                           onClick={() => setDeleting(x)}
-                          className={`${iconButtonClass} hover:text-rose-600`}
+                          className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50"
                           aria-label={`Delete ${x.name}`}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Delete
                         </button>
                       </div>
                     </td>
