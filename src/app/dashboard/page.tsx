@@ -14,6 +14,7 @@ import { getErrorMessage, getErrorStatus } from "@/lib/api";
 import { ButtonSpinner, LoadingScreen } from "@/components/dashboard/DataUI";
 import { useToast } from "@/components/ui/ToastProvider";
 import Sidebar from "@/components/dashboard/Sidebar";
+import type { ReportId } from "@/components/dashboard/reportNavigation";
 import CustomerLedgerTab from "@/components/dashboard/tabs/CustomerLedgerTab";
 import DashboardTab from "@/components/dashboard/tabs/DashboardTab";
 import ProductsTab from "@/components/dashboard/tabs/ProductsTab";
@@ -31,6 +32,8 @@ export default function DashboardPage() {
   const inventoryBusy = useInventoryBusy();
   const activeTab = useAppSelector((state) => state.client.activeTab);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [activeReport, setActiveReport] =
+    useState<ReportId>("daily-transactions");
   const [inventoryReady, setInventoryReady] = useState(false);
   const [loadError, setLoadError] = useState("");
 
@@ -81,7 +84,7 @@ export default function DashboardPage() {
     "Finished Products": <ProductsTab />,
     Sales: <SalesHistoryTab />,
     "Customer Ledger": <CustomerLedgerTab />,
-    Reports: <ReportsTab />,
+    Reports: <ReportsTab activeReport={activeReport} />,
   }[activeTab] ?? <DashboardTab />;
 
   if (!inventoryReady) {
@@ -113,7 +116,12 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-slate-100/80 lg:flex">
-      <Sidebar activeTab={activeTab} setActiveTab={changeTab} />
+      <Sidebar
+        activeTab={activeTab}
+        setActiveTab={changeTab}
+        activeReport={activeReport}
+        setActiveReport={setActiveReport}
+      />
 
       <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur lg:hidden">
         <div className="flex min-w-0 items-center gap-3">
@@ -149,6 +157,8 @@ export default function DashboardPage() {
           <Sidebar
             activeTab={activeTab}
             setActiveTab={changeTab}
+            activeReport={activeReport}
+            setActiveReport={setActiveReport}
             mobile
             onClose={() => setMenuOpen(false)}
           />

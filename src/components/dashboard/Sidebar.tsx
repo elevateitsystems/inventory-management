@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   BarChart3,
   Boxes,
+  ChevronDown,
   Factory,
   LayoutDashboard,
   LogOut,
@@ -16,10 +17,16 @@ import {
 import { useRouter } from "next/navigation";
 import { apiRequest } from "@/lib/api";
 import { ButtonSpinner } from "@/components/dashboard/DataUI";
+import {
+  reportItems,
+  type ReportId,
+} from "@/components/dashboard/reportNavigation";
 
 interface SidebarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
+  activeReport: ReportId;
+  setActiveReport: (report: ReportId) => void;
   mobile?: boolean;
   onClose?: () => void;
 }
@@ -38,15 +45,25 @@ const menuItems = [
 export default function Sidebar({
   activeTab,
   setActiveTab,
+  activeReport,
+  setActiveReport,
   mobile = false,
   onClose,
 }: SidebarProps) {
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [reportsOpen, setReportsOpen] = useState(activeTab === "Reports");
   const navigate = (tab: string) => {
     setActiveTab(tab);
+    setReportsOpen(false);
     onClose?.();
   };
+  const selectReport = (report: ReportId) => {
+    setActiveReport(report);
+    setActiveTab("Reports");
+    onClose?.();
+  };
+  const reportsMenuId = `reports-submenu-${mobile ? "mobile" : "desktop"}`;
 
   return (
     <aside
@@ -82,21 +99,87 @@ export default function Sidebar({
           Operations
         </p>
         <nav className="space-y-1">
-          {menuItems.map((item) => (
-            <button
-              key={item.name}
-              onClick={() => navigate(item.name)}
-              aria-current={activeTab === item.name ? "page" : undefined}
-              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition ${
-                activeTab === item.name
-                  ? "bg-indigo-500 text-white shadow-lg shadow-indigo-950/20"
-                  : "text-slate-400 hover:bg-white/5 hover:text-white"
-              }`}
-            >
-              <item.icon className="h-[18px] w-[18px] shrink-0" />
-              <span className="truncate">{item.name}</span>
-            </button>
-          ))}
+          {menuItems.map((item) => {
+            const isActive = activeTab === item.name;
+
+            if (item.name === "Reports") {
+              return (
+                <div key={item.name}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const opening = !reportsOpen;
+                      setReportsOpen(opening);
+                      if (opening) setActiveTab("Reports");
+                    }}
+                    aria-current={isActive ? "page" : undefined}
+                    aria-expanded={reportsOpen}
+                    aria-controls={reportsMenuId}
+                    className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition ${
+                      isActive
+                        ? "bg-indigo-500 text-white shadow-lg shadow-indigo-950/20"
+                        : "text-slate-400 hover:bg-white/5 hover:text-white"
+                    }`}
+                  >
+                    <item.icon className="h-[18px] w-[18px] shrink-0" />
+                    <span className="min-w-0 flex-1 truncate">{item.name}</span>
+                    <ChevronDown
+                      className={`h-4 w-4 shrink-0 transition-transform ${reportsOpen ? "rotate-180" : ""}`}
+                      aria-hidden="true"
+                    />
+                  </button>
+                  {reportsOpen && (
+                    <div
+                      id={reportsMenuId}
+                      className="mt-1 space-y-1 border-l border-white/10 py-1 pl-3 ml-5"
+                    >
+                      {reportItems.map((report) => {
+                        const reportActive =
+                          isActive && activeReport === report.id;
+                        return (
+                          <button
+                            key={report.id}
+                            type="button"
+                            onClick={() => selectReport(report.id)}
+                            aria-current={reportActive ? "page" : undefined}
+                            aria-controls="report-panel"
+                            className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-medium transition ${
+                              reportActive
+                                ? "bg-indigo-400/15 text-indigo-200"
+                                : "text-slate-500 hover:bg-white/5 hover:text-slate-200"
+                            }`}
+                          >
+                            <span
+                              className={`h-1.5 w-1.5 shrink-0 rounded-full ${reportActive ? "bg-indigo-300" : "bg-slate-600"}`}
+                              aria-hidden="true"
+                            />
+                            <span>{report.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            return (
+              <button
+                key={item.name}
+                type="button"
+                onClick={() => navigate(item.name)}
+                aria-current={isActive ? "page" : undefined}
+                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition ${
+                  isActive
+                    ? "bg-indigo-500 text-white shadow-lg shadow-indigo-950/20"
+                    : "text-slate-400 hover:bg-white/5 hover:text-white"
+                }`}
+              >
+                <item.icon className="h-[18px] w-[18px] shrink-0" />
+                <span className="truncate">{item.name}</span>
+              </button>
+            );
+          })}
         </nav>
       </div>
       <div className="shrink-0 border-t border-white/10 p-3 sm:p-4">

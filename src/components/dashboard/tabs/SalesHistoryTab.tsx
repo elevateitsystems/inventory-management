@@ -1,7 +1,14 @@
 "use client";
 import { getErrorMessage } from "@/lib/api";
 import { useMemo, useState, type FormEvent } from "react";
-import { Pencil, Plus, Search, ShoppingBag, Trash2 } from "lucide-react";
+import {
+  FileText,
+  Pencil,
+  Plus,
+  Search,
+  ShoppingBag,
+  Trash2,
+} from "lucide-react";
 import {
   useAppDispatch,
   useAppSelector,
@@ -37,6 +44,7 @@ import {
   Pagination,
 } from "../DataUI";
 import PageHeader from "../PageHeader";
+import SalesInvoiceModal from "../SalesInvoiceModal";
 const SIZE = 6;
 export default function SalesHistoryTab() {
   const dispatch = useAppDispatch(),
@@ -48,6 +56,7 @@ export default function SalesHistoryTab() {
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Sale | "new" | null>(null);
   const [deleting, setDeleting] = useState<Sale | null>(null);
+  const [invoicing, setInvoicing] = useState<Sale | null>(null);
   const activeC = customers.filter((x) => x.active),
     activeP = finishedProducts.filter((x) => x.active && x.stock > 0);
   const rows = useMemo(
@@ -197,14 +206,26 @@ export default function SalesHistoryTab() {
                     <td className="px-5 py-4">
                       <div className="flex justify-end">
                         <button
+                          onClick={() => setInvoicing(x)}
+                          className={`${iconButtonClass} hover:text-indigo-600`}
+                          aria-label={`View invoice ${x.ref}`}
+                          title="View invoice"
+                        >
+                          <FileText className="h-4 w-4" />
+                        </button>
+                        <button
                           onClick={() => setEditing(x)}
                           className={iconButtonClass}
+                          aria-label={`Edit invoice ${x.ref}`}
+                          title="Edit sale"
                         >
                           <Pencil className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => setDeleting(x)}
                           className={`${iconButtonClass} hover:text-rose-600`}
+                          aria-label={`Delete invoice ${x.ref}`}
+                          title="Delete sale"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -233,6 +254,18 @@ export default function SalesHistoryTab() {
           onClose={() => setEditing(null)}
         />
       )}{" "}
+      {invoicing && (
+        <SalesInvoiceModal
+          sale={invoicing}
+          customer={customers.find(
+            (customer) => customer.id === invoicing.customerId,
+          )}
+          product={finishedProducts.find(
+            (product) => product.id === invoicing.productId,
+          )}
+          onClose={() => setInvoicing(null)}
+        />
+      )}
       {deleting && (
         <ConfirmDialog
           description={`Delete ${deleting.ref}? Stock will be restored and its ledger debit removed.`}
