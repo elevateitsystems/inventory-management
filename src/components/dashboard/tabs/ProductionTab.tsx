@@ -1,8 +1,356 @@
 "use client";
+import { getErrorMessage } from "@/lib/api";
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import{useMemo,useState,type FormEvent}from"react";import{Factory,Pencil,Plus,Search,Trash2}from"lucide-react";import{useAppDispatch,useAppSelector}from"@/store/hooks";import{deleteProduction,recordProduction,updateProduction,type Production,type RawMaterial,type FinishedProduct}from"@/store/slices/inventorySlice";import{formatDateTime,nowIso}from"@/lib/inventory";import{useToast}from"@/components/ui/ToastProvider";import Modal,{FormField,inputClass,primaryButtonClass,secondaryButtonClass}from"../Modal";import{ConfirmDialog,EmptyState,iconButtonClass,Pagination}from"../DataUI";import PageHeader from"../PageHeader";
-const SIZE=6;export default function ProductionTab(){const dispatch=useAppDispatch(),toast=useToast();const{productions,rawMaterials,finishedProducts,sales}=useAppSelector(s=>s.inventory);const[search,setSearch]=useState("");const[page,setPage]=useState(1);const[editing,setEditing]=useState<Production|"new"|null>(null);const[deleting,setDeleting]=useState<Production|null>(null);const activeM=rawMaterials.filter(x=>x.active),activeP=finishedProducts.filter(x=>x.active);const rows=useMemo(()=>[...productions].filter(x=>`${x.ref} ${rawMaterials.find(m=>m.id===x.materialId)?.name} ${finishedProducts.find(p=>p.id===x.productId)?.name}`.toLowerCase().includes(search.toLowerCase())).sort((a,b)=>b.date.localeCompare(a.date)),[productions,rawMaterials,finishedProducts,search]);const pages=Math.max(1,Math.ceil(rows.length/SIZE)),current=Math.min(page,pages),visible=rows.slice((current-1)*SIZE,current*SIZE);
-const submit=(e:FormEvent<HTMLFormElement>)=>{e.preventDefault();const d=new FormData(e.currentTarget),payload={materialId:Number(d.get("materialId")),materialQuantity:Number(d.get("materialQuantity")),productId:Number(d.get("productId")),productQuantity:Number(d.get("productQuantity")),date:new Date(String(d.get("date"))).toISOString()};const mat=rawMaterials.find(x=>x.id===payload.materialId);const available=(mat?.stock??0)+(editing!=="new"&&editing?.materialId===payload.materialId?editing.materialQuantity:0);if(payload.materialQuantity>available)return toast("Not enough raw material stock for this batch.","error");if(editing==="new")dispatch(recordProduction(payload));else if(editing)dispatch(updateProduction({...editing,...payload}));toast(editing==="new"?"Production completed and stock moved.":"Production updated and stock reconciled.");setEditing(null)};
-const remove=()=>{if(!deleting)return;const product=finishedProducts.find(x=>x.id===deleting.productId);if((product?.stock??0)<deleting.productQuantity){toast("This batch cannot be deleted because some of its output has already been sold.","error");setDeleting(null);return}dispatch(deleteProduction(deleting.id));toast("Production batch deleted and movements reversed.");setDeleting(null)};
-return <div className="space-y-5"><PageHeader title="Production" description="Convert raw materials into finished products with linked stock movements." action={<button onClick={()=>setEditing("new")} disabled={!activeM.length||!activeP.length} className={primaryButtonClass}><Plus className="h-4 w-4"/>Record production</button>}/><div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-4 text-sm text-indigo-800"><div className="flex gap-3"><Factory className="h-5 w-5"/><p>Every batch creates raw material <strong>Stock OUT</strong> and finished product <strong>Stock IN</strong>. Editing or deleting reverses both safely.</p></div></div><section className="rounded-2xl border bg-white shadow-sm"><div className="border-b p-4"><div className="relative max-w-md"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/><input value={search} onChange={e=>{setSearch(e.target.value);setPage(1)}} className={`${inputClass} pl-9`} placeholder="Search batches"/></div></div><div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-5 py-3">Batch</th><th className="px-5 py-3">Raw material used</th><th className="px-5 py-3">Finished product</th><th className="px-5 py-3">Output</th><th className="px-5 py-3">Date</th><th className="px-5 py-3 text-right">Actions</th></tr></thead><tbody className="divide-y">{visible.map(x=>{const m=rawMaterials.find(y=>y.id===x.materialId),p=finishedProducts.find(y=>y.id===x.productId);return <tr key={x.id}><td className="px-5 py-4 font-semibold text-indigo-600">{x.ref}</td><td className="px-5 py-4"><p>{m?.name}</p><p className="text-xs text-rose-600">-{x.materialQuantity} {m?.unit}</p></td><td className="px-5 py-4">{p?.name}</td><td className="px-5 py-4 font-semibold text-emerald-600">+{x.productQuantity} {p?.unit}</td><td className="px-5 py-4 text-slate-500">{formatDateTime(x.date)}</td><td className="px-5 py-4"><div className="flex justify-end"><button onClick={()=>setEditing(x)} className={iconButtonClass}><Pencil className="h-4 w-4"/></button><button onClick={()=>setDeleting(x)} className={`${iconButtonClass} hover:text-rose-600`}><Trash2 className="h-4 w-4"/></button></div></td></tr>})}</tbody></table>{!visible.length&&<EmptyState/>}</div><Pagination page={current} pages={pages} total={rows.length} onChange={setPage}/></section>{editing&&<ProductionModal row={editing==="new"?undefined:editing} materials={editing==="new"?activeM:rawMaterials} products={editing==="new"?activeP:finishedProducts} onSubmit={submit} onClose={()=>setEditing(null)}/>} {deleting&&<ConfirmDialog description={`Delete ${deleting.ref}? Its linked stock movements will be reversed.`} onCancel={()=>setDeleting(null)} onConfirm={remove}/>}</div>}
-function ProductionModal({row,materials,products,onSubmit,onClose}:{row?:Production;materials:RawMaterial[];products:FinishedProduct[];onSubmit:(e:FormEvent<HTMLFormElement>)=>void;onClose:()=>void}){const[mid,setMid]=useState(row?.materialId??materials[0]?.id??0),m=materials.find(x=>x.id===mid);return <Modal title={row?"Edit production":"Record production"} description="Stock availability is validated before saving." onClose={onClose}><form onSubmit={onSubmit} className="space-y-4"><FormField label="Raw material"><select name="materialId" value={mid} onChange={e=>setMid(Number(e.target.value))} className={inputClass}>{materials.map(x=><option key={x.id} value={x.id}>{x.name} — {x.stock} {x.unit}</option>)}</select></FormField><FormField label={`Quantity consumed (${m?.unit??"units"})`} hint={`Available: ${(m?.stock??0)+(row?.materialId===mid?row.materialQuantity:0)}`}><input name="materialQuantity" required min="0.01" step="0.01" type="number" defaultValue={row?.materialQuantity} className={inputClass}/></FormField><FormField label="Finished product"><select name="productId" defaultValue={row?.productId??products[0]?.id} className={inputClass}>{products.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></FormField><FormField label="Quantity produced"><input name="productQuantity" required min="0.01" step="0.01" type="number" defaultValue={row?.productQuantity} className={inputClass}/></FormField><FormField label="Date and time"><input name="date" required type="datetime-local" defaultValue={(row?.date??nowIso()).slice(0,16)} className={inputClass}/></FormField><div className="flex justify-end gap-3"><button type="button" onClick={onClose} className={secondaryButtonClass}>Cancel</button><button className={primaryButtonClass}><Factory className="h-4 w-4"/>Save batch</button></div></form></Modal>}
+import { useMemo, useState, type FormEvent } from "react";
+import { Factory, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import {
+  useAppDispatch,
+  useAppSelector,
+  useInventoryBusy,
+} from "@/store/hooks";
+import {
+  deleteProduction,
+  recordProduction,
+  updateProduction,
+  type Production,
+  type RawMaterial,
+  type FinishedProduct,
+} from "@/store/slices/inventorySlice";
+import {
+  findCreatedRecord,
+  formatDateTime,
+  nowIso,
+  pageContainingRecord,
+} from "@/lib/inventory";
+import { useToast } from "@/components/ui/ToastProvider";
+import Modal, {
+  FormField,
+  inputClass,
+  primaryButtonClass,
+  secondaryButtonClass,
+} from "../Modal";
+import {
+  ButtonSpinner,
+  ConfirmDialog,
+  EmptyState,
+  iconButtonClass,
+  Pagination,
+} from "../DataUI";
+import PageHeader from "../PageHeader";
+const SIZE = 6;
+export default function ProductionTab() {
+  const dispatch = useAppDispatch(),
+    toast = useToast();
+  const { productions, rawMaterials, finishedProducts, sales } = useAppSelector(
+    (s) => s.inventory,
+  );
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [editing, setEditing] = useState<Production | "new" | null>(null);
+  const [deleting, setDeleting] = useState<Production | null>(null);
+  const activeM = rawMaterials.filter((x) => x.active),
+    activeP = finishedProducts.filter((x) => x.active);
+  const rows = useMemo(
+    () =>
+      [...productions]
+        .filter((x) =>
+          `${x.ref} ${rawMaterials.find((m) => m.id === x.materialId)?.name} ${finishedProducts.find((p) => p.id === x.productId)?.name}`
+            .toLowerCase()
+            .includes(search.toLowerCase()),
+        )
+        .sort((a, b) => b.date.localeCompare(a.date)),
+    [productions, rawMaterials, finishedProducts, search],
+  );
+  const pages = Math.max(1, Math.ceil(rows.length / SIZE)),
+    current = Math.min(page, pages),
+    visible = rows.slice((current - 1) * SIZE, current * SIZE);
+  const submit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const d = new FormData(e.currentTarget),
+      payload = {
+        materialId: Number(d.get("materialId")),
+        materialQuantity: Number(d.get("materialQuantity")),
+        productId: Number(d.get("productId")),
+        productQuantity: Number(d.get("productQuantity")),
+        date: new Date(String(d.get("date"))).toISOString(),
+      };
+    const mat = rawMaterials.find((x) => x.id === payload.materialId);
+    const available =
+      (mat?.stock ?? 0) +
+      (editing !== "new" && editing?.materialId === payload.materialId
+        ? editing.materialQuantity
+        : 0);
+    if (payload.materialQuantity > available)
+      return toast("Not enough raw material stock for this batch.", "error");
+    try {
+      if (editing === "new") {
+        const updated = await dispatch(recordProduction(payload)).unwrap();
+        const created = findCreatedRecord(productions, updated.productions);
+        if (created) {
+          const ordered = [...updated.productions].sort((a, b) =>
+            b.date.localeCompare(a.date),
+          );
+          setSearch("");
+          setPage(pageContainingRecord(ordered, created.id, SIZE));
+        }
+      } else if (editing)
+        await dispatch(updateProduction({ ...editing, ...payload })).unwrap();
+      toast(
+        editing === "new"
+          ? "Production completed and stock moved."
+          : "Production updated and stock reconciled.",
+      );
+      setEditing(null);
+    } catch (reason) {
+      toast(getErrorMessage(reason, "Unable to save production."), "error");
+    }
+  };
+  const remove = async () => {
+    if (!deleting) return;
+    const product = finishedProducts.find((x) => x.id === deleting.productId);
+    if ((product?.stock ?? 0) < deleting.productQuantity) {
+      toast(
+        "This batch cannot be deleted because some of its output has already been sold.",
+        "error",
+      );
+      setDeleting(null);
+      return;
+    }
+    try {
+      await dispatch(deleteProduction(deleting.id)).unwrap();
+      toast("Production batch deleted and movements reversed.");
+      setDeleting(null);
+    } catch (reason) {
+      toast(getErrorMessage(reason, "Unable to delete production."), "error");
+    }
+  };
+  return (
+    <div className="space-y-5">
+      <PageHeader
+        title="Production"
+        description="Convert raw materials into finished products with linked stock movements."
+        action={
+          <button
+            onClick={() => setEditing("new")}
+            disabled={!activeM.length || !activeP.length}
+            className={primaryButtonClass}
+          >
+            <Plus className="h-4 w-4" />
+            Record production
+          </button>
+        }
+      />
+      <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-4 text-sm text-indigo-800">
+        <div className="flex gap-3">
+          <Factory className="h-5 w-5" />
+          <p>
+            Every batch creates raw material <strong>Stock OUT</strong> and
+            finished product <strong>Stock IN</strong>. Editing or deleting
+            reverses both safely.
+          </p>
+        </div>
+      </div>
+      <section className="rounded-2xl border bg-white shadow-sm">
+        <div className="border-b p-4">
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              className={`${inputClass} pl-9`}
+              placeholder="Search batches"
+            />
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[900px] text-left text-sm">
+            <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+              <tr>
+                <th className="px-5 py-3">Batch</th>
+                <th className="px-5 py-3">Raw material used</th>
+                <th className="px-5 py-3">Finished product</th>
+                <th className="px-5 py-3">Output</th>
+                <th className="px-5 py-3">Date</th>
+                <th className="px-5 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {visible.map((x) => {
+                const m = rawMaterials.find((y) => y.id === x.materialId),
+                  p = finishedProducts.find((y) => y.id === x.productId);
+                return (
+                  <tr key={x.id}>
+                    <td className="px-5 py-4 font-semibold text-indigo-600">
+                      {x.ref}
+                    </td>
+                    <td className="px-5 py-4">
+                      <p>{m?.name}</p>
+                      <p className="text-xs text-rose-600">
+                        -{x.materialQuantity} {m?.unit}
+                      </p>
+                    </td>
+                    <td className="px-5 py-4">{p?.name}</td>
+                    <td className="px-5 py-4 font-semibold text-emerald-600">
+                      +{x.productQuantity} {p?.unit}
+                    </td>
+                    <td className="px-5 py-4 text-slate-500">
+                      {formatDateTime(x.date)}
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex justify-end">
+                        <button
+                          onClick={() => setEditing(x)}
+                          className={iconButtonClass}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => setDeleting(x)}
+                          className={`${iconButtonClass} hover:text-rose-600`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {!visible.length && <EmptyState />}
+        </div>
+        <Pagination
+          page={current}
+          pages={pages}
+          total={rows.length}
+          onChange={setPage}
+        />
+      </section>
+      {editing && (
+        <ProductionModal
+          row={editing === "new" ? undefined : editing}
+          materials={editing === "new" ? activeM : rawMaterials}
+          products={editing === "new" ? activeP : finishedProducts}
+          onSubmit={submit}
+          onClose={() => setEditing(null)}
+        />
+      )}{" "}
+      {deleting && (
+        <ConfirmDialog
+          description={`Delete ${deleting.ref}? Its linked stock movements will be reversed.`}
+          onCancel={() => setDeleting(null)}
+          onConfirm={remove}
+        />
+      )}
+    </div>
+  );
+}
+function ProductionModal({
+  row,
+  materials,
+  products,
+  onSubmit,
+  onClose,
+}: {
+  row?: Production;
+  materials: RawMaterial[];
+  products: FinishedProduct[];
+  onSubmit: (e: FormEvent<HTMLFormElement>) => void;
+  onClose: () => void;
+}) {
+  const busy = useInventoryBusy();
+  const [mid, setMid] = useState(row?.materialId ?? materials[0]?.id ?? 0),
+    m = materials.find((x) => x.id === mid);
+  return (
+    <Modal
+      title={row ? "Edit production" : "Record production"}
+      description="Stock availability is validated before saving."
+      onClose={onClose}
+    >
+      <form onSubmit={onSubmit} className="space-y-4">
+        <FormField label="Raw material">
+          <select
+            name="materialId"
+            value={mid}
+            onChange={(e) => setMid(Number(e.target.value))}
+            className={inputClass}
+          >
+            {materials.map((x) => (
+              <option key={x.id} value={x.id}>
+                {x.name} — {x.stock} {x.unit}
+              </option>
+            ))}
+          </select>
+        </FormField>
+        <FormField
+          label={`Quantity consumed (${m?.unit ?? "units"})`}
+          hint={`Available: ${(m?.stock ?? 0) + (row?.materialId === mid ? row.materialQuantity : 0)}`}
+        >
+          <input
+            name="materialQuantity"
+            required
+            min="0.01"
+            step="0.01"
+            type="number"
+            defaultValue={row?.materialQuantity}
+            className={inputClass}
+          />
+        </FormField>
+        <FormField label="Finished product">
+          <select
+            name="productId"
+            defaultValue={row?.productId ?? products[0]?.id}
+            className={inputClass}
+          >
+            {products.map((x) => (
+              <option key={x.id} value={x.id}>
+                {x.name}
+              </option>
+            ))}
+          </select>
+        </FormField>
+        <FormField label="Quantity produced">
+          <input
+            name="productQuantity"
+            required
+            min="0.01"
+            step="0.01"
+            type="number"
+            defaultValue={row?.productQuantity}
+            className={inputClass}
+          />
+        </FormField>
+        <FormField label="Date and time">
+          <input
+            name="date"
+            required
+            type="datetime-local"
+            defaultValue={(row?.date ?? nowIso()).slice(0, 16)}
+            className={inputClass}
+          />
+        </FormField>
+        <div className="flex justify-end gap-3">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onClose}
+            className={secondaryButtonClass}
+          >
+            Cancel
+          </button>
+          <button
+            disabled={busy}
+            aria-busy={busy}
+            className={primaryButtonClass}
+          >
+            {busy ? <ButtonSpinner /> : <Factory className="h-4 w-4" />}
+            {busy ? "Saving..." : "Save batch"}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}

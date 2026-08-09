@@ -1,11 +1,21 @@
 "use client";
 
-import { BarChart3, Boxes, Factory, LayoutDashboard, LogOut, PackageCheck, ReceiptText, RotateCcw, ShoppingCart, Users, X } from "lucide-react";
+import { useState } from "react";
+import {
+  BarChart3,
+  Boxes,
+  Factory,
+  LayoutDashboard,
+  LogOut,
+  PackageCheck,
+  ReceiptText,
+  ShoppingCart,
+  Users,
+  X,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useAppDispatch } from "@/store/hooks";
-import { resetInventory } from "@/store/slices/inventorySlice";
-import { signOut } from "@/lib/mockAuth";
-import { useToast } from "@/components/ui/ToastProvider";
+import { apiRequest } from "@/lib/api";
+import { ButtonSpinner } from "@/components/dashboard/DataUI";
 
 interface SidebarProps {
   activeTab: string;
@@ -25,10 +35,14 @@ const menuItems = [
   { name: "Reports", icon: BarChart3 },
 ];
 
-export default function Sidebar({ activeTab, setActiveTab, mobile = false, onClose }: SidebarProps) {
-  const dispatch = useAppDispatch();
+export default function Sidebar({
+  activeTab,
+  setActiveTab,
+  mobile = false,
+  onClose,
+}: SidebarProps) {
   const router = useRouter();
-  const toast = useToast();
+  const [loggingOut, setLoggingOut] = useState(false);
   const navigate = (tab: string) => {
     setActiveTab(tab);
     onClose?.();
@@ -49,16 +63,24 @@ export default function Sidebar({ activeTab, setActiveTab, mobile = false, onClo
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate font-bold tracking-tight">StockFlow</p>
-          <p className="truncate text-[11px] text-slate-400">Inventory Management</p>
+          <p className="truncate text-[11px] text-slate-400">
+            Inventory Management
+          </p>
         </div>
         {mobile && (
-          <button onClick={onClose} className="rounded-lg p-2 text-slate-400 hover:bg-white/10 hover:text-white" aria-label="Close navigation">
+          <button
+            onClick={onClose}
+            className="rounded-lg p-2 text-slate-400 hover:bg-white/10 hover:text-white"
+            aria-label="Close navigation"
+          >
             <X className="h-5 w-5" />
           </button>
         )}
       </div>
       <div className="flex-1 overflow-y-auto px-3 py-4 sm:py-5">
-        <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Operations</p>
+        <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
+          Operations
+        </p>
         <nav className="space-y-1">
           {menuItems.map((item) => (
             <button
@@ -80,10 +102,32 @@ export default function Sidebar({ activeTab, setActiveTab, mobile = false, onClo
       <div className="shrink-0 border-t border-white/10 p-3 sm:p-4">
         <div className="rounded-xl bg-white/5 p-3">
           <p className="text-xs font-semibold text-white">Inventory Admin</p>
-          <p className="mt-0.5 text-[11px] text-slate-500">All operational records saved</p>
-          <div className="mt-3 flex gap-1 border-t border-white/10 pt-2">
-            <button onClick={() => { if (window.confirm("Reset all demo inventory data to the original sample records?")) { dispatch(resetInventory()); toast("Demo data reset."); } }} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[11px] text-slate-400 hover:bg-white/10 hover:text-white"><RotateCcw className="h-3.5 w-3.5" />Reset</button>
-            <button onClick={() => { signOut(); router.push("/login"); }} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[11px] text-slate-400 hover:bg-white/10 hover:text-white"><LogOut className="h-3.5 w-3.5" />Sign out</button>
+          <p className="mt-0.5 text-[11px] text-slate-500">
+            All operational records saved
+          </p>
+          <div className="mt-3 flex border-t border-white/10 pt-2">
+            <button
+              disabled={loggingOut}
+              aria-busy={loggingOut}
+              onClick={async () => {
+                if (loggingOut) return;
+                setLoggingOut(true);
+                try {
+                  await apiRequest("/api/auth/logout", { method: "POST" });
+                } finally {
+                  router.push("/login");
+                  router.refresh();
+                }
+              }}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[11px] text-slate-400 hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loggingOut ? (
+                <ButtonSpinner />
+              ) : (
+                <LogOut className="h-3.5 w-3.5" />
+              )}
+              {loggingOut ? "Signing out..." : "Sign out"}
+            </button>
           </div>
         </div>
       </div>
