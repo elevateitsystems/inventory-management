@@ -4,12 +4,15 @@ import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail, UserRound } from "lucide-react";
 import AuthShell, { authButtonClass, authInputClass } from "./AuthShell";
+import { registerUser } from "@/lib/mockAuth";
+import { useToast } from "@/components/ui/ToastProvider";
 
 export default function RegisterForm() {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
+  const toast = useToast();
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -21,6 +24,11 @@ export default function RegisterForm() {
       setError("Passwords do not match. Please enter them again.");
       return;
     }
+    if (!registerUser({ name: String(data.get("name")).trim(), email: String(data.get("email")).trim(), password: String(data.get("password")) })) {
+      setError("An account with this email already exists.");
+      return;
+    }
+    toast("Account created. You can now sign in.");
     startTransition(() => router.push("/login"));
   };
 
