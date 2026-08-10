@@ -101,37 +101,3 @@
     @apply font-sans;
   }
 }
-
-@media print {
-  @page {
-    size: A4;
-    margin: 10mm;
-  }
-
-  body {
-    background: white !important;
-  }
-
-  body.invoice-printing-enabled * {
-    visibility: hidden !important;
-  }
-
-  .invoice-print-area,
-  .invoice-print-area * {
-    visibility: visible !important;
-    print-color-adjust: exact;
-    -webkit-print-color-adjust: exact;
-  }
-
-  .invoice-print-area {
-    position: absolute !important;
-    inset: 0 auto auto 0 !important;
-    width: 100% !important;
-    border: 0 !important;
-    box-shadow: none !important;
-  }
-
-  .invoice-no-print {
-    display: none !important;
-  }
-}

@@ -6,7 +6,10 @@ import {
   ArrowUpFromLine,
   CalendarDays,
   ClipboardList,
-  Download,
+  FileDown,
+  FileSpreadsheet,
+  LoaderCircle,
+  Printer,
 } from "lucide-react";
 import { useAppSelector } from "@/store/hooks";
 import {
@@ -18,6 +21,12 @@ import {
 import { inputClass, secondaryButtonClass } from "../Modal";
 import PageHeader from "../PageHeader";
 import type { ReportId } from "../reportNavigation";
+import {
+  exportReportExcel,
+  exportReportPdf,
+  printReport,
+  type ReportExportData,
+} from "../reportExports";
 import { useToast } from "@/components/ui/ToastProvider";
 
 const today = new Date().toISOString().slice(0, 10);
@@ -31,6 +40,9 @@ export default function ReportsTab({
   const toast = useToast();
   const [reportDate, setReportDate] = useState(today);
   const [reportMonth, setReportMonth] = useState(today.slice(0, 7));
+  const [exporting, setExporting] = useState<"pdf" | "excel" | "print" | null>(
+    null,
+  );
   const dailyTransactions = inventory.transactions.filter(
     (item) => getDateKey(item.date) === reportDate,
   );
@@ -77,44 +89,80 @@ export default function ReportsTab({
         .reduce((sum, movement) => sum + movement.quantity, 0),
     };
   });
-  const exportCsv = () => {
-    const rows = inventoryRows.map((item) => [
-      item.sku,
-      item.name,
-      item.kind,
-      item.openingStock,
-      item.stockIn,
-      item.stockOut,
-      item.stock,
-      item.unit,
-    ]);
-    const csv = [
-      [
-        "SKU",
-        "Item",
-        "Category",
-        "Opening",
-        "Stock IN",
-        "Stock OUT",
-        "Closing",
-        "Unit",
-      ],
-      ...rows,
-    ]
-      .map((row) =>
-        row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(","),
-      )
-      .join("\n");
-    const url = URL.createObjectURL(
-      new Blob([csv], { type: "text/csv;charset=utf-8" }),
-    );
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `inventory-report-${today}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-    toast("Inventory report downloaded.");
-  };
+  let reportExport: ReportExportData;
+  switch (activeReport) {
+    case "daily-transactions":
+      reportExport = {
+        title: "Daily Transactions",
+        subtitle: `Transaction activity for ${reportDate}`,
+        filename: `daily-transactions-${reportDate}`,
+        columns: ["Type", "Reference", "Party / Item", "Amount (USD)"],
+        rows: dailyTransactions.map((item) => [
+          item.type,
+          item.ref,
+          item.party,
+          item.amount,
+        ]),
+      };
+      break;
+    case "daily-stock-movement":
+      reportExport = {
+        title: "Daily Stock Movement",
+        subtitle: `Stock movement activity for ${reportDate}`,
+        filename: `daily-stock-movement-${reportDate}`,
+        columns: ["Item", "Stock Type", "Movement", "Reason", "Quantity"],
+        rows: dailyMovements.map((item) => [
+          item.itemName,
+          item.stockType,
+          item.type,
+          item.reason,
+          item.quantity,
+        ]),
+      };
+      break;
+    case "monthly-report":
+      reportExport = {
+        title: "Monthly Report",
+        subtitle: `Financial summary for ${reportMonth}`,
+        filename: `monthly-report-${reportMonth}`,
+        columns: ["Metric", "Value"],
+        rows: [
+          ["Sales (USD)", monthlySales],
+          ["Purchases (USD)", monthlyPurchases],
+          ["Payments received (USD)", monthlyPayments],
+          ["Returns (USD)", monthlyReturns],
+          ["Transactions", monthlyTransactions.length],
+        ],
+      };
+      break;
+    default:
+      reportExport = {
+        title: "Inventory Report",
+        subtitle:
+          "Opening balance, stock movement, and current closing balance",
+        filename: `inventory-report-${today}`,
+        columns: [
+          "SKU",
+          "Item",
+          "Category",
+          "Opening",
+          "Stock IN",
+          "Stock OUT",
+          "Closing",
+          "Unit",
+        ],
+        rows: inventoryRows.map((item) => [
+          item.sku,
+          item.name,
+          item.kind,
+          item.openingStock,
+          item.stockIn,
+          item.stockOut,
+          item.stock,
+          item.unit,
+        ]),
+      };
+  }
 
   return (
     <div className="space-y-5">
@@ -122,10 +170,69 @@ export default function ReportsTab({
         title="Reports"
         description="Daily transactions, stock movements, monthly summaries, and inventory balances."
         action={
-          <button onClick={exportCsv} className={secondaryButtonClass}>
-            <Download className="h-4 w-4" />
-            Export inventory CSV
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={exporting !== null}
+              aria-busy={exporting === "pdf"}
+              onClick={async () => {
+                setExporting("pdf");
+                try {
+                  await exportReportPdf(reportExport);
+                  toast(`${reportExport.title} PDF exported.`);
+                } catch {
+                  toast("Unable to export the report PDF.", "error");
+                } finally {
+                  setExporting(null);
+                }
+              }}
+              className={secondaryButtonClass}
+            >
+              {exporting === "pdf" ? (
+                <LoaderCircle className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileDown className="h-4 w-4" />
+              )}
+              Export PDF
+            </button>
+            <button
+              type="button"
+              disabled={exporting !== null}
+              onClick={() => {
+                setExporting("excel");
+                try {
+                  exportReportExcel(reportExport);
+                  toast(`${reportExport.title} Excel file exported.`);
+                } catch {
+                  toast("Unable to export the Excel file.", "error");
+                } finally {
+                  setExporting(null);
+                }
+              }}
+              className={secondaryButtonClass}
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              Export Excel
+            </button>
+            <button
+              type="button"
+              disabled={exporting !== null}
+              onClick={() => {
+                setExporting("print");
+                try {
+                  printReport(reportExport);
+                } catch {
+                  toast("Allow pop-ups to print this report.", "error");
+                } finally {
+                  setExporting(null);
+                }
+              }}
+              className={secondaryButtonClass}
+            >
+              <Printer className="h-4 w-4" />
+              Print
+            </button>
+          </div>
         }
       />
       <div id="report-panel">

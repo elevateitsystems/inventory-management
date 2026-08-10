@@ -3,6 +3,9 @@
 import { useMemo, useState, type FormEvent } from "react";
 import {
   ArrowUpDown,
+  Download,
+  Eye,
+  LoaderCircle,
   Pencil,
   Plus,
   Search,
@@ -40,10 +43,10 @@ import {
   ButtonSpinner,
   ConfirmDialog,
   EmptyState,
-  iconButtonClass,
   Pagination,
 } from "../DataUI";
 import PageHeader from "../PageHeader";
+import SalesInvoiceModal, { downloadInvoicePdf } from "../SalesInvoiceModal";
 
 const PAGE_SIZE = 6;
 
@@ -59,6 +62,8 @@ export default function PurchaseHistoryTab() {
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Purchase | "new" | null>(null);
   const [deleting, setDeleting] = useState<Purchase | null>(null);
+  const [viewing, setViewing] = useState<Purchase | null>(null);
+  const [downloading, setDownloading] = useState<number | null>(null);
   const rows = useMemo(
     () =>
       purchases
@@ -210,7 +215,7 @@ export default function PurchaseHistoryTab() {
           </button>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] text-left text-sm">
+          <table className="w-full min-w-[1100px] text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase text-slate-500">
               <tr>
                 <th className="px-5 py-3">Reference</th>
@@ -244,20 +249,74 @@ export default function PurchaseHistoryTab() {
                       {formatDateTime(row.date)}
                     </td>
                     <td className="px-5 py-4">
-                      <div className="flex justify-end">
+                      <div className="flex items-center justify-end gap-1">
                         <button
-                          onClick={() => setEditing(row)}
-                          className={iconButtonClass}
-                          aria-label={`Edit ${row.ref}`}
+                          type="button"
+                          onClick={() => setViewing(row)}
+                          className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
                         >
-                          <Pencil className="h-4 w-4" />
+                          <Eye className="h-3.5 w-3.5" />
+                          View
                         </button>
                         <button
+                          type="button"
+                          onClick={() => setEditing(row)}
+                          className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-indigo-600 transition hover:bg-indigo-50"
+                          aria-label={`Edit ${row.ref}`}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          Edit
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => setDeleting(row)}
-                          className={`${iconButtonClass} hover:text-rose-600`}
+                          className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50"
                           aria-label={`Delete ${row.ref}`}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Delete
+                        </button>
+                        <button
+                          type="button"
+                          disabled={downloading === row.id}
+                          aria-busy={downloading === row.id}
+                          onClick={async () => {
+                            setDownloading(row.id);
+                            try {
+                              await downloadInvoicePdf(
+                                {
+                                  ref: row.ref,
+                                  quantity: row.quantity,
+                                  unitPrice: row.unitCost,
+                                  total: row.total,
+                                  date: row.date,
+                                },
+                                { name: row.supplier },
+                                material,
+                                {
+                                  documentTitle: "Purchase Bill",
+                                  partyLabel: "Supplier",
+                                  filenamePrefix: "purchase-bill",
+                                },
+                              );
+                              toast("Purchase bill downloaded.");
+                            } catch {
+                              toast(
+                                "Unable to download the purchase invoice.",
+                                "error",
+                              );
+                            } finally {
+                              setDownloading(null);
+                            }
+                          }}
+                          className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2 py-1.5 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {downloading === row.id ? (
+                            <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Download className="h-3.5 w-3.5" />
+                          )}
+                          Download Bill
                         </button>
                       </div>
                     </td>
@@ -281,6 +340,26 @@ export default function PurchaseHistoryTab() {
           materials={editing === "new" ? activeMaterials : rawMaterials}
           onSubmit={submit}
           onClose={() => setEditing(null)}
+        />
+      )}
+      {viewing && (
+        <SalesInvoiceModal
+          sale={{
+            ref: viewing.ref,
+            quantity: viewing.quantity,
+            unitPrice: viewing.unitCost,
+            total: viewing.total,
+            date: viewing.date,
+          }}
+          customer={{ name: viewing.supplier }}
+          product={rawMaterials.find(
+            (material) => material.id === viewing.materialId,
+          )}
+          documentTitle="Purchase Bill"
+          partyLabel="Supplier"
+          filenamePrefix="purchase-bill"
+          downloadLabel="Download Bill"
+          onClose={() => setViewing(null)}
         />
       )}
       {deleting && (

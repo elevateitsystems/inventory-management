@@ -2,7 +2,16 @@
 import { getErrorMessage } from "@/lib/api";
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { useMemo, useState, type FormEvent } from "react";
-import { Factory, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import {
+  Download,
+  Eye,
+  Factory,
+  LoaderCircle,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+} from "lucide-react";
 import {
   useAppDispatch,
   useAppSelector,
@@ -33,10 +42,12 @@ import {
   ButtonSpinner,
   ConfirmDialog,
   EmptyState,
-  iconButtonClass,
   Pagination,
 } from "../DataUI";
 import PageHeader from "../PageHeader";
+import ProductionDocumentModal, {
+  downloadProductionPdf,
+} from "../ProductionDocumentModal";
 const SIZE = 6;
 export default function ProductionTab() {
   const dispatch = useAppDispatch(),
@@ -48,6 +59,8 @@ export default function ProductionTab() {
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Production | "new" | null>(null);
   const [deleting, setDeleting] = useState<Production | null>(null);
+  const [viewing, setViewing] = useState<Production | null>(null);
+  const [downloading, setDownloading] = useState<number | null>(null);
   const activeM = rawMaterials.filter((x) => x.active),
     activeP = finishedProducts.filter((x) => x.active);
   const rows = useMemo(
@@ -166,7 +179,7 @@ export default function ProductionTab() {
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] text-left text-sm">
+          <table className="w-full min-w-[1100px] text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase text-slate-500">
               <tr>
                 <th className="px-5 py-3">Batch</th>
@@ -200,18 +213,57 @@ export default function ProductionTab() {
                       {formatDateTime(x.date)}
                     </td>
                     <td className="px-5 py-4">
-                      <div className="flex justify-end">
+                      <div className="flex items-center justify-end gap-1">
                         <button
-                          onClick={() => setEditing(x)}
-                          className={iconButtonClass}
+                          type="button"
+                          onClick={() => setViewing(x)}
+                          className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
                         >
-                          <Pencil className="h-4 w-4" />
+                          <Eye className="h-3.5 w-3.5" />
+                          View
                         </button>
                         <button
-                          onClick={() => setDeleting(x)}
-                          className={`${iconButtonClass} hover:text-rose-600`}
+                          type="button"
+                          onClick={() => setEditing(x)}
+                          className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-indigo-600 transition hover:bg-indigo-50"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Pencil className="h-3.5 w-3.5" />
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeleting(x)}
+                          className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Delete
+                        </button>
+                        <button
+                          type="button"
+                          disabled={downloading === x.id}
+                          aria-busy={downloading === x.id}
+                          onClick={async () => {
+                            setDownloading(x.id);
+                            try {
+                              await downloadProductionPdf(x, m, p);
+                              toast("Production report downloaded.");
+                            } catch {
+                              toast(
+                                "Unable to download the production PDF.",
+                                "error",
+                              );
+                            } finally {
+                              setDownloading(null);
+                            }
+                          }}
+                          className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2 py-1.5 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {downloading === x.id ? (
+                            <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Download className="h-3.5 w-3.5" />
+                          )}
+                          Download Report
                         </button>
                       </div>
                     </td>
@@ -238,6 +290,18 @@ export default function ProductionTab() {
           onClose={() => setEditing(null)}
         />
       )}{" "}
+      {viewing && (
+        <ProductionDocumentModal
+          production={viewing}
+          material={rawMaterials.find(
+            (material) => material.id === viewing.materialId,
+          )}
+          product={finishedProducts.find(
+            (product) => product.id === viewing.productId,
+          )}
+          onClose={() => setViewing(null)}
+        />
+      )}
       {deleting && (
         <ConfirmDialog
           description={`Delete ${deleting.ref}? Its linked stock movements will be reversed.`}
